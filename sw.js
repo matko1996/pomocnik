@@ -1,6 +1,6 @@
 // Uloží aplikáciu do telefónu, aby sa otvorila aj pri slabom internete.
 // Pri zmene súborov aplikácie zvýšte číslo verzie, aby si telefón stiahol novú.
-const CACHE = 'pomocnik-v2';
+const CACHE = 'pomocnik-v3';
 const SHELL = ['./', 'index.html', 'style.css', 'app.js', 'manifest.webmanifest',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 

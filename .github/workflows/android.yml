@@ -1,0 +1,51 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Podpisový kľúč
+        run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/pomocnik.jks"
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+
+      - name: Zostavenie APK
+        working-directory: android
+        run: gradle assembleRelease --no-daemon --stacktrace
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/pomocnik.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      # Najnovšia verzia je vždy na rovnakej adrese:
+      # https://github.com/matko1996/pomocnik/releases/latest/download/pomocnik.apk
+      - name: Zverejnenie
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk pomocnik.apk
+          gh release delete apk --yes --cleanup-tag || true
+          gh release create apk pomocnik.apk --target "$GITHUB_SHA" --latest \
+            --title "Pomocník pre Android" \
+            --notes "Zostava ${{ github.run_number }}. Stiahnuť: pomocnik.apk"

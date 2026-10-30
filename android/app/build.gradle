@@ -1,0 +1,39 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'sk.pomocnik.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'sk.pomocnik.app'
+        minSdk 29
+        targetSdk 35
+        // Číslo zostavy z GitHub Actions – každá nová verzia sa nainštaluje cez starú.
+        versionCode((System.getenv('GITHUB_RUN_NUMBER') ?: '1') as int)
+        versionName "1.0.${System.getenv('GITHUB_RUN_NUMBER') ?: '0'}"
+    }
+
+    // Podpisový kľúč prichádza z tajných premenných GitHubu (nikdy nie je v repozitári).
+    signingConfigs {
+        release {
+            storeFile file(System.getenv('KEYSTORE_FILE') ?: 'chyba-kluc.jks')
+            storePassword System.getenv('KEYSTORE_PASSWORD')
+            keyAlias System.getenv('KEY_ALIAS')
+            keyPassword System.getenv('KEY_PASSWORD')
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

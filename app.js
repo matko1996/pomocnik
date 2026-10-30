@@ -4,7 +4,7 @@
  * Všetky nastavenia (kontakty, fotky, rádiá, kalendár) sa ukladajú len v tomto telefóne.
  */
 
-const VERSION = '1.2';
+const VERSION = '1.3';
 
 // ===================== Nastavenia a úložisko =====================
 
@@ -118,9 +118,34 @@ function showCaption(text) {
   captionTimer = setTimeout(() => c.classList.add('hidden'), 9000);
 }
 
+// V aplikácii pre Android hovorí a počúva priamo Android (window.PomocnikAndroid z MainActivity.java).
+const NATIVE = window.PomocnikAndroid || null;
+const ttsWaiting = new Map();
+window.__pomocnikTts = id => { const f = ttsWaiting.get(id); if (f) f(); };
+
+function sayNative(text, my) {
+  return new Promise(resolve => {
+    const id = 'u' + my;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      ttsWaiting.delete(id);
+      if (my === speakSeq) duck(false);
+      resolve(my === speakSeq);
+    };
+    const timer = setTimeout(finish, 3000 + text.length * 110 / (S.rate || 1));
+    ttsWaiting.set(id, finish);
+    duck(true);
+    NATIVE.speak(text, S.rate || 1, id);
+  });
+}
+
 // Vráti true, ak sa veta dohovorila; false, ak ju prerušila iná veta.
 function say(text) {
   showCaption(text);
+  if (NATIVE) return sayNative(text, ++speakSeq);
   if (!('speechSynthesis' in window)) return Promise.resolve(true);
   const my = ++speakSeq;
   speechSynthesis.cancel();
@@ -149,7 +174,8 @@ function say(text) {
 
 function stopSpeaking() {
   speakSeq++;
-  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  if (NATIVE) NATIVE.stopSpeaking();
+  else if ('speechSynthesis' in window) speechSynthesis.cancel();
   duck(false);
 }
 
@@ -367,12 +393,20 @@ function playNext() {
 
 const cleanNumber = n => (n || '').replace(/[^\d+]/g, '');
 
+// Aplikácia pre Android volá priamo; v prehliadači sa otvorí vytáčanie a treba ťuknúť na zelené slúchadlo.
+const callsDirectly = () => !!NATIVE && NATIVE.canCallDirectly();
+const greenHint = text => callsDirectly() ? '' : text;
+function dial(num) {
+  if (NATIVE) NATIVE.call(num);
+  else location.href = 'tel:' + num;
+}
+
 async function callContact(c) {
   const num = cleanNumber(c.phone);
   if (!num) return say(`${c.name} nemá nastavené telefónne číslo.`);
   player.pause();
-  const ok = await say((c.voiceName ? `Volám ${c.voiceName}.` : `Volám: ${c.name}.`) + ' Potom ťukni na zelený telefón.');
-  if (ok) location.href = 'tel:' + num;
+  const ok = await say((c.voiceName ? `Volám ${c.voiceName}.` : `Volám: ${c.name}.`) + greenHint(' Potom ťukni na zelený telefón.'));
+  if (ok) dial(num);
 }
 
 const HELP_WINDOW = 10 * 60e3;
@@ -388,8 +422,8 @@ async function callHelp() {
   writeJSON('help', { t: Date.now(), step, asked: false });
   player.pause();
   // Pri pomoci voláme aj vtedy, ak vetu niečo preruší.
-  await say(`Volám pomoc: ${target.voiceName || target.name}. Ťukni na zelený telefón.`);
-  location.href = 'tel:' + num;
+  await say(`Volám pomoc: ${target.voiceName || target.name}.` + greenHint(' Ťukni na zelený telefón.'));
+  dial(num);
 }
 
 // Po návrate z hovoru o pomoc sa opýtame, či sa dovolal; ak nie, ponúkneme záložný kontakt.
@@ -624,7 +658,33 @@ $('reminder').addEventListener('click', async () => {
 
 // ===================== Rozpoznávanie reči =====================
 
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+// Rozpoznávanie reči z Androidu v rovnakej podobe ako v Chrome (start, abort, onresult, onerror, onend).
+class NativeSR {
+  start() {
+    NativeSR.current = this;
+    setTimeout(() => { if (NativeSR.current === this) NATIVE.listen(this.lang || 'sk-SK'); }, 250);
+  }
+  abort() {
+    if (NativeSR.current !== this) return;
+    NativeSR.current = null;
+    NATIVE.stopListening();
+  }
+}
+window.__pomocnikSR = (type, data) => {
+  const r = NativeSR.current;
+  if (!r) return;
+  if (type === 'result') {
+    const res = Object.assign(JSON.parse(data).map(t => ({ transcript: t })), { isFinal: true });
+    if (r.onresult) r.onresult({ results: [res] });
+  } else if (type === 'error') {
+    if (r.onerror) r.onerror({ error: data });
+  } else if (type === 'end') {
+    NativeSR.current = null;
+    if (r.onend) r.onend();
+  }
+};
+
+const SR = NATIVE ? NativeSR : (window.SpeechRecognition || window.webkitSpeechRecognition);
 let listening = null;          // { cancel } počas počúvania
 const SETTLE_MS = 2000;        // po vete ešte chvíľu čakáme, či používateľ nepokračuje
 
@@ -905,6 +965,7 @@ $('help-backup').addEventListener('click', () => {
 
 let wakeLock = null;
 async function keepAwake() {
+  if (NATIVE) { NATIVE.keepAwake(!!S.keepAwake); return; }
   if (!S.keepAwake || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
   try { wakeLock = await navigator.wakeLock.request('screen'); } catch { /* */ }
 }
@@ -931,6 +992,25 @@ document.addEventListener('visibilitychange', () => {
 if ('serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
+
+// Aplikácia pre Android nepotrebuje úvodné ťuknutie – spustí sa sama, keď je pripravený hlas.
+if (NATIVE) {
+  const t0 = Date.now();
+  const autoStart = () => {
+    if (started) return;
+    if (NATIVE.ttsReady() || Date.now() - t0 > 6000) $('start').click();
+    else setTimeout(autoStart, 200);
+  };
+  autoStart();
+}
+
+// Tlačidlo Späť v Androide: krok späť v Pomocníkovi; aplikácia sa ním nezavrie.
+window.__pomocnikBack = () => {
+  if (!$('settings').classList.contains('hidden')) { closeSettings(); return true; }
+  if (!$('help-check').classList.contains('hidden') || !$('reminder').classList.contains('hidden')) return true;
+  if (screen !== 'home') { goBack(); return true; }
+  return false;
+};
 
 // ===================== Nastavenia (pre rodinu) =====================
 
@@ -1201,7 +1281,8 @@ function settingsVoice() {
   return [
     h('h2', {}, '🔊 Hlas a ovládanie'),
     h('div', { class: 'card' },
-      h('label', {}, 'Hlas'), sel,
+      // V aplikácii pre Android sa hlas vyberá v Nastaveniach telefónu (Prevod textu na reč).
+      !NATIVE && [h('label', {}, 'Hlas'), sel],
       h('label', {}, 'Rýchlosť reči'), rate,
       h('div', { class: 'row' }, btn('▶️ Vyskúšať hlas', () => say('Dobrý deň. Toto je skúška hlasu. ' + timeSentence()))),
       field('Ako dlho čakať na hlasový povel (sekúnd)', S, 'listenSeconds', 'number', { min: 5, max: 60 }),
@@ -1219,8 +1300,15 @@ function settingsBackup() {
     h('p', { class: 'hint' }, 'Záloha obsahuje kontakty, fotky a ostatné nastavenia. Nahraté MP3 súbory v nej nie sú.'),
     h('div', { class: 'card' }, h('div', { class: 'row', style: 'margin:0' },
       btn('⬇️ Uložiť zálohu do súboru', () => {
-        const blob = new Blob([JSON.stringify({ app: 'pomocnik', version: VERSION, settings: S }, null, 1)], { type: 'application/json' });
-        const a = h('a', { href: URL.createObjectURL(blob), download: `pomocnik-zaloha-${new Date().toISOString().slice(0, 10)}.json` });
+        const text = JSON.stringify({ app: 'pomocnik', version: VERSION, settings: S }, null, 1);
+        const name = `pomocnik-zaloha-${new Date().toISOString().slice(0, 10)}.json`;
+        if (NATIVE) {
+          const r = NATIVE.saveFile(name, text);
+          alert(r === 'ok' ? `Záloha je uložená v priečinku Stiahnuté súbory (${name}).` : 'Zálohu sa nepodarilo uložiť: ' + r);
+          return;
+        }
+        const blob = new Blob([text], { type: 'application/json' });
+        const a = h('a', { href: URL.createObjectURL(blob), download: name });
         document.body.append(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 5000);
       }),
@@ -1239,6 +1327,16 @@ function settingsBackup() {
 
 function settingsDiagnostics() {
   const line = (ok, text) => h('div', { class: ok ? 'ok' : 'bad' }, (ok ? '✅ ' : '❌ ') + text);
+  if (NATIVE) {
+    return [
+      h('h2', {}, '🩺 Kontrola telefónu'),
+      h('div', { class: 'card diag' },
+        line(NATIVE.canCallDirectly(), NATIVE.canCallDirectly() ? 'Volanie priamo, bez obrazovky vytáčania'
+          : 'Volanie priamo nie je povolené – Nastavenia → Aplikácie → Pomocník → Povolenia → Telefón'),
+        line(NATIVE.hasSlovakVoice(), 'Slovenský hlas' + (NATIVE.hasSlovakVoice() ? '' : ' chýba – pozri návod (Prevod textu na reč)')),
+        h('div', { class: 'hint', style: 'margin:8px 0 0' }, `Verzia ${VERSION}, aplikácia pre Android ${NATIVE.version()}`)),
+    ];
+  }
   const standalone = matchMedia('(display-mode: standalone)').matches;
   return [
     h('h2', {}, '🩺 Kontrola telefónu'),
