@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="sk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0f172a">
+<title>Pomocník</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Prvé ťuknutie odomkne zvuk, hlas a mikrofón (vyžaduje to prehliadač) -->
+<div id="start" class="overlay start">
+  <div class="huge">👆</div>
+  <div class="start-text">Ťukni kamkoľvek</div>
+</div>
+
+<main id="app">
+  <header class="topbar">
+    <button id="btn-back" class="back hidden" aria-label="Späť">⬅️</button>
+    <div id="clock" class="clock">--:--</div>
+    <button id="btn-settings" class="gear" aria-label="Nastavenia – podrž 2 sekundy">⚙️</button>
+  </header>
+
+  <button id="btn-mic" class="mic" aria-label="Ťukni a povedz, čo chceš">
+    <span class="mic-icon">🎤</span>
+    <span id="mic-label" class="mic-label">Ťukni a povedz</span>
+  </button>
+
+  <section id="screen-home" class="screen home">
+    <button class="tile t-family" data-action="contacts"><span class="ti">👨‍👩‍👧</span><span class="tl">Rodina</span></button>
+    <button class="tile t-help" data-action="help"><span class="ti">🆘</span><span class="tl">Pomoc</span></button>
+    <button class="tile t-radio" data-action="radio"><span class="ti">📻</span><span class="tl">Rádio</span></button>
+    <button class="tile t-read" data-action="read"><span class="ti">📚</span><span class="tl">Rozprávky a knihy</span></button>
+    <button class="tile t-music" data-action="music"><span class="ti">🎵</span><span class="tl">Hudba</span></button>
+    <button class="tile t-time" data-action="today"><span class="ti">🕒</span><span class="tl">Čas a program</span></button>
+  </section>
+
+  <section id="screen-contacts" class="screen contacts hidden"></section>
+  <section id="screen-list" class="screen list hidden"></section>
+  <section id="screen-today" class="screen today hidden"></section>
+
+  <div id="caption" class="caption hidden"></div>
+
+  <div id="player" class="player hidden">
+    <span id="player-icon" class="player-icon">📻</span>
+    <span id="player-title" class="player-title"></span>
+    <button id="player-toggle" class="player-btn" aria-label="Pauza">⏸️</button>
+    <button id="player-stop" class="player-btn stop" aria-label="Stop">⏹️</button>
+  </div>
+</main>
+
+<!-- Pripomienka z kalendára – ťuknutie kamkoľvek ju potvrdí -->
+<div id="reminder" class="overlay reminder hidden">
+  <div class="huge">⏰</div>
+  <div id="reminder-title" class="reminder-title"></div>
+  <div class="reminder-ok">👍 Ťukni, keď je hotovo</div>
+</div>
+
+<!-- Po hovore o pomoc: dovolal sa? -->
+<div id="help-check" class="overlay help-check hidden">
+  <button id="help-ok" class="half ok"><span class="huge">✅</span><span>Áno, dovolal som sa</span></button>
+  <button id="help-backup" class="half backup"><span class="huge">📞</span><span id="help-backup-name">Zavolať záložný kontakt</span></button>
+</div>
+
+<div id="settings" class="settings hidden"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
