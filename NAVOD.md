@@ -104,7 +104,34 @@ Při pozdější změně kódu skriptu použijte **Nasadiť → Spravovať nasad
 Připomínka zazní v čase začátku události (celodenní události v čase nastaveném v Pomocníkovi, výchozí 8:00).
 Pokud byl telefon vypnutý déle než 30 minut po čase události, připomínka se už nepřehraje.
 
-## 5. Úpravy aplikace později
+## 5. Aplikace pro Android (doporučeno)
+
+Samostatná aplikace **volá přímo**. Po výběru kontaktu hovor rovnou začne, bez obrazovky s číslem a bez ťukání
+na zelené sluchátko. Hlas a rozpoznávání řeči obstarává přímo Android a aplikace se spustí bez úvodního ťuknutí.
+Vzhled a ovládání jsou stejné, protože aplikace zobrazuje stejného Pomocníka z internetu. Úpravy Pomocníka se proto
+projeví i v ní, bez přeinstalování.
+
+### Instalace (jednou, na jeho telefonu)
+1. V Chrome otevřete **https://github.com/matko1996/pomocnik/releases/latest/download/pomocnik.apk** a soubor stáhněte.
+2. Otevřete stažený `pomocnik.apk` (oznámení, nebo aplikace Moje súbory → Stiahnuté).
+3. Telefon se zeptá na **inštaláciu neznámych aplikácií** → **Nastavenia** → povolit pro Chrome (nebo Moje súbory) → zpět → **Inštalovať**.
+4. Pokud se objeví **Google Play Protect** („neznámy vývojár“), zvolte **Ďalšie podrobnosti → Aj tak nainštalovať**.
+   Aplikace není v Obchodě Play, proto to varování vypadá takto.
+5. Spusťte **Pomocník** a povolte **Mikrofón** a **Telefón** („Povoliť“). Bez povolení Telefón se volá jen přes obrazovku vytáčení.
+6. Nastavení si aplikace s webovou verzí v Chrome nesdílí. Kontakty se načtou z Google Kontaktů (stačí znovu zadat
+   adresu skriptu a TOKEN). Jinak ve webové verzi uložte **Zálohu** a v aplikaci ji **Obnovte**.
+7. Ikonu webové verze z plochy odstraňte, aby nebyly na ploše dvě.
+
+V nastavení aplikace je dole **Kontrola telefónu**. Musí ukazovat ✅ u „Volanie priamo“ a „Slovenský hlas“.
+
+Tlačítko **Späť** v aplikaci vrací o krok zpět a aplikaci nikdy nezavře.
+Novou verzi samotné Android aplikace (potřebnou jen při změnách v části pro Android) nainstalujete stejným odkazem přes tu starou.
+Nastavení zůstanou zachována.
+
+**Podpisový klíč** aplikace je ve složce `C:\CLAUDIE\Chess\pomocnik-podpis` (soubor `pomocnik.jks` + `heslo.txt`).
+Zálohujte ji. Bez ní by šlo novou verzi nainstalovat jen po odinstalování staré.
+
+## 6. Úpravy aplikace později
 
 Aplikaci aktualizuje Claude přímo do repozitáře na GitHubu. Telefon si novou verzi stáhne při dalším otevření
 Pomocníka (někdy je potřeba aplikaci zavřít a otevřít ještě jednou). Nastavení v telefonu zůstanou zachována.
@@ -113,7 +140,7 @@ Pomocníka (někdy je potřeba aplikaci zavřít a otevřít ještě jednou). Na
 
 - Hlasové ovládání potřebuje **internet** (rozpoznávání řeči běží u Googlu). Bez internetu fungují dlaždice a nahrané MP3.
 - Telefon neposlouchá pořád, nejdřív se musí ťuknout na mikrofon.
-- **Obrazovka volání** patří systému Android (aplikace Telefón), ne Pomocníkovi. Pomocník nemůže zablokovat její tlačítka.
-  Úplně bezpečné volání bez této obrazovky by vyžadovalo samostatnou aplikaci pro Android.
+- Ve **webové verzi** (Chrome) se při volání zobrazí obrazovka vytáčení aplikace Telefón a je potřeba ťuknout na zelené sluchátko.
+  **Aplikace pro Android** (kapitola 5) volá přímo. Během hovoru se ale i tak ukáže obrazovka hovoru s červeným tlačítkem pro zavěšení.
 - Po restartu telefonu nebo zavření aplikace je potřeba Pomocníka znovu otevřít a jednou ťuknout (prohlížeč jinak nepustí zvuk).
 - Pomocník mu tyká. Dá se změnit na vykání.
