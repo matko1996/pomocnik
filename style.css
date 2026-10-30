@@ -1,15 +1,13 @@
 :root {
   --bg: #0f172a;
   --fg: #f8fafc;
-  --muted: #94a3b8;
   --panel: #1e293b;
-  --line: #334155;
   --mic: #16a34a;
   --mic-on: #dc2626;
+  --menu: #2563eb;
   --family: #2563eb;
   --help: #dc2626;
   --radio: #7c3aed;
-  --read: #ea580c;
   --music: #0d9488;
   --time: #facc15;
   --select: #fde047;
@@ -27,114 +25,92 @@ body {
 }
 button { font: inherit; color: inherit; border: 0; cursor: pointer; touch-action: manipulation; }
 .hidden { display: none !important; }
-.huge { font-size: min(28vw, 160px); line-height: 1.1; }
+.huge { font-size: min(40vw, 30vh, 260px); line-height: 1.1; }
 
-/* ---------- Hlavné rozloženie ---------- */
+/* ---------- Hlavné rozloženie (bez textov – len obrázky) ---------- */
 #app {
-  display: flex; flex-direction: column;
+  position: relative;
+  display: flex; flex-direction: column; gap: var(--gap);
   height: 100dvh;
-  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  padding: calc(env(safe-area-inset-top) + var(--gap)) var(--gap) calc(env(safe-area-inset-bottom) + var(--gap));
 }
-.topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 10px; min-height: 64px;
+.screen { flex: 1; min-height: 0; }
+
+/* Nastavenia: malé, vyblednuté koliesko v rohu, otvára sa podržaním */
+.gear {
+  position: absolute; top: calc(env(safe-area-inset-top) + 14px); right: 14px; z-index: 5;
+  background: none; font-size: 22px; opacity: .35; width: 48px; height: 48px;
 }
-.clock { font-size: 40px; font-weight: 700; letter-spacing: 1px; flex: 1; text-align: center; }
-.back {
-  background: var(--panel); border-radius: 16px;
-  font-size: 40px; width: 96px; height: 56px;
-}
-.gear { background: none; font-size: 24px; opacity: .45; width: 56px; height: 56px; }
-.topbar .back.hidden + .clock { margin-left: 56px; }
 
 .mic {
-  margin: 0 var(--gap) var(--gap);
-  min-height: 22vh;
-  border-radius: 28px;
-  background: var(--mic);
-  display: flex; align-items: center; justify-content: center; gap: 16px;
+  background: var(--mic); border-radius: 32px;
+  display: flex; align-items: center; justify-content: center;
   box-shadow: 0 6px 0 #0c6b30;
 }
 .mic:active { transform: translateY(3px); box-shadow: 0 3px 0 #0c6b30; }
-.mic-icon { font-size: min(18vw, 110px); }
-.mic-label { font-size: 30px; font-weight: 700; }
 .mic.listening { background: var(--mic-on); box-shadow: 0 6px 0 #7f1d1d; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { filter: brightness(1.35); } }
 
-.screen { flex: 1; min-height: 0; padding: 0 var(--gap) var(--gap); overflow-y: auto; }
-
-/* ---------- Domov: 6 veľkých dlaždíc ---------- */
-.home {
-  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 1fr);
-  gap: var(--gap); overflow: hidden;
-}
-.tile {
-  border-radius: 24px;
+/* Domov: dve maximálne tlačidlá – mikrofón a výber obrázkom */
+.home { display: flex; flex-direction: column; gap: var(--gap); }
+.mic-big { flex: 1; }
+.mic-icon { font-size: min(45vw, 28vh, 260px); line-height: 1; }
+.menu-btn {
+  flex: 1; border-radius: 32px; background: var(--menu);
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 6px; min-height: 0;
+  box-shadow: 0 6px 0 #1e3a8a; line-height: 1.05;
+}
+.menu-btn:active { transform: translateY(3px); box-shadow: 0 3px 0 #1e3a8a; }
+.mb-top { font-size: min(30vw, 16vh, 200px); }
+.mb-bottom { font-size: min(26vw, 14vh, 170px); display: flex; gap: 6vw; }
+
+/* Podobrazovky: hore veľké Späť a mikrofón */
+.subbar { display: flex; gap: var(--gap); height: 14vh; min-height: 84px; }
+.back {
+  flex: 1; border-radius: 26px; background: #475569; font-size: min(18vw, 9vh, 110px);
+  box-shadow: 0 6px 0 #1e293b;
+}
+.mic-small { flex: 1; font-size: min(18vw, 9vh, 110px); border-radius: 26px; }
+
+/* Výber: Rodina, Rádio, Hudba – tri obrovské dlaždice */
+.menu { display: flex; flex-direction: column; gap: var(--gap); }
+.tile {
+  flex: 1; min-height: 0; border-radius: 28px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: min(36vw, 17vh, 220px); line-height: 1;
 }
 .tile:active { filter: brightness(1.3); }
-.ti { font-size: min(14vw, 13vh, 96px); line-height: 1.1; }
-.tl { font-size: 22px; font-weight: 700; text-align: center; line-height: 1.15; }
 .t-family { background: var(--family); }
-.t-help { background: var(--help); }
 .t-radio { background: var(--radio); }
-.t-read { background: var(--read); }
 .t-music { background: var(--music); }
-.t-time { background: var(--time); color: #111; }
 
-.armed { outline: 8px solid var(--select); outline-offset: -8px; animation: pulse .8s infinite; }
+.armed { outline: 10px solid var(--select); outline-offset: -10px; animation: pulse .8s infinite; }
 
-/* ---------- Kontakty: mriežka fotiek ---------- */
-.contacts { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--gap); align-content: start; }
-.person {
-  border-radius: 20px; padding: 6px; display: flex; flex-direction: column; align-items: center;
-  background: var(--panel); border: 6px solid var(--c, var(--family));
+/* Kontakty a zoznamy: mriežka vyplní celú obrazovku, počet stĺpcov podľa počtu položiek */
+.fill-grid { display: grid; gap: var(--gap); }
+.person, .item {
+  min-height: 0; min-width: 0; border-radius: 22px; padding: 6px; overflow: hidden;
+  background: var(--c, var(--panel)); display: flex; align-items: center; justify-content: center;
 }
-.person .photo {
-  width: 100%; aspect-ratio: 1; border-radius: 14px; object-fit: cover;
-  background: var(--c, var(--family));
-  display: flex; align-items: center; justify-content: center; font-size: 13vw; font-weight: 800;
-}
-.person .name { font-size: 18px; font-weight: 700; margin-top: 4px; text-align: center; line-height: 1.1; }
+.person { border: 6px solid var(--c, var(--family)); background: var(--c, var(--family)); padding: 0; }
+.person img, .item img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; display: block; }
+.person .noface, .item .ii { font-size: min(22vw, 12vh, 160px); line-height: 1; }
+.item.playing { outline: 10px solid var(--select); outline-offset: -10px; }
+.empty { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; font-size: min(40vw, 30vh); opacity: .5; }
 
-/* ---------- Zoznam: rádiá, rozprávky, hudba ---------- */
-.list { display: flex; flex-direction: column; gap: var(--gap); }
-.item {
-  display: flex; align-items: center; gap: 14px; text-align: left;
-  border-radius: 20px; padding: 14px; min-height: 96px; background: var(--c, var(--panel));
-}
-.item .ii { font-size: 52px; }
-.item .it { font-size: 24px; font-weight: 700; line-height: 1.2; }
-.item.playing { outline: 6px solid var(--select); outline-offset: -6px; }
-.empty { color: var(--muted); font-size: 24px; text-align: center; padding: 30px 10px; }
-
-/* ---------- Čas a program ---------- */
-.today { text-align: center; }
-.today .big-time { font-size: min(26vw, 140px); font-weight: 800; line-height: 1; margin-top: 8px; }
-.today .big-date { font-size: 28px; margin: 6px 0 18px; color: var(--time); font-weight: 700; }
-.today .ev { display: flex; gap: 14px; align-items: center; text-align: left; background: var(--panel); border-radius: 16px; padding: 12px 16px; margin-bottom: 8px; font-size: 22px; }
-.today .ev .t { font-weight: 800; min-width: 80px; }
-.today .ev.past { opacity: .45; }
-
-/* ---------- Titulky a prehrávač ---------- */
-/* Titulky sú len pre rodinu – ležia nad mikrofónom a ťuknutia nimi prechádzajú. */
+/* ---------- Titulky (len pre rodinu, zapínajú sa v nastaveniach) a prehrávač ---------- */
 .caption {
-  position: fixed; left: var(--gap); right: var(--gap); top: calc(env(safe-area-inset-top) + 70px); z-index: 40;
+  position: fixed; left: var(--gap); right: var(--gap); bottom: calc(env(safe-area-inset-bottom) + 12px); z-index: 40;
   padding: 10px 14px; border-radius: 14px; pointer-events: none;
-  background: rgba(0, 0, 0, .85); color: #fff; font-size: 19px; line-height: 1.3; text-align: center;
+  background: rgba(0, 0, 0, .85); color: #fff; font-size: 18px; line-height: 1.3; text-align: center;
   max-height: 20vh; overflow: hidden;
 }
-/* Mimo domovskej obrazovky je mikrofón nižší, aby sa zmestilo viac fotiek. */
-#app.sub .mic { min-height: 11vh; }
-#app.sub .mic-icon { font-size: min(11vw, 60px); }
 .player {
-  display: flex; align-items: center; gap: 10px;
-  margin: 0 var(--gap) var(--gap); padding: 8px 10px; border-radius: 20px; background: var(--panel);
+  display: flex; align-items: center; gap: var(--gap);
+  padding: 8px; border-radius: 24px; background: var(--panel); height: 13vh; min-height: 84px;
 }
-.player-icon { font-size: 40px; }
-.player-title { flex: 1; font-size: 20px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.player-btn { font-size: 44px; width: 84px; height: 76px; border-radius: 16px; background: #475569; }
+.player-icon { font-size: min(14vw, 8vh, 80px); width: 22%; text-align: center; }
+.player-btn { flex: 1; height: 100%; font-size: min(14vw, 8vh, 80px); border-radius: 20px; background: #475569; }
 .player-btn.stop { background: var(--help); }
 
 /* ---------- Prekrytia ---------- */
@@ -144,17 +120,19 @@ button { font: inherit; color: inherit; border: 0; cursor: pointer; touch-action
   padding: 24px;
 }
 .start { background: var(--mic); }
-.start-text { font-size: 40px; font-weight: 800; }
-.reminder { background: var(--time); color: #111; animation: pulse 1.2s infinite; }
-.reminder-title { font-size: 40px; font-weight: 800; margin: 10px 0 30px; }
-.reminder-ok { font-size: 30px; font-weight: 700; background: #111; color: #fff; border-radius: 20px; padding: 18px 24px; }
+.reminder { background: var(--time); color: #111; animation: pulse 1.2s infinite; gap: 4vh; }
+.reminder-ok { font-size: min(30vw, 20vh, 200px); background: #111; border-radius: 40px; padding: 10px 40px; }
 .help-check { padding: 0; background: #000; }
-.half { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 30px; font-weight: 800; }
-.half .huge { font-size: min(24vw, 130px); }
+.half { flex: 1; width: 100%; display: flex; align-items: center; justify-content: center; gap: 6vw; }
+.half .huge { font-size: min(32vw, 20vh, 200px); }
 .half.ok { background: var(--mic); }
 .half.backup { background: var(--help); }
+.help-photo img, .help-photo .noface {
+  width: min(38vw, 24vh); height: min(38vw, 24vh); border-radius: 24px; object-fit: cover;
+  display: flex; align-items: center; justify-content: center; font-size: min(26vw, 16vh); background: rgba(255,255,255,.2);
+}
 
-/* ---------- Nastavenia (pre rodinu) ---------- */
+/* ---------- Nastavenia (pre rodinu – tu texty zostávajú) ---------- */
 .settings {
   position: fixed; inset: 0; z-index: 60; overflow-y: auto;
   background: #f1f5f9; color: #0f172a; font-size: 17px; user-select: text; -webkit-user-select: text;

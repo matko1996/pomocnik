@@ -12,58 +12,58 @@
 </head>
 <body>
 
-<!-- Prvé ťuknutie odomkne zvuk, hlas a mikrofón (vyžaduje to prehliadač) -->
-<div id="start" class="overlay start">
+<!-- Prvé ťuknutie odomkne zvuk, hlas a mikrofón (vyžaduje to prehliadač).
+     Používateľ nečíta – na obrazovke sú len obrázky, všetko sa hovorí nahlas. -->
+<div id="start" class="overlay start" aria-label="Ťukni kamkoľvek">
   <div class="huge">👆</div>
-  <div class="start-text">Ťukni kamkoľvek</div>
 </div>
 
 <main id="app">
-  <header class="topbar">
-    <button id="btn-back" class="back hidden" aria-label="Späť">⬅️</button>
-    <div id="clock" class="clock">--:--</div>
-    <button id="btn-settings" class="gear" aria-label="Nastavenia – podrž 2 sekundy">⚙️</button>
+  <button id="btn-settings" class="gear" aria-label="Nastavenia – podrž 2 sekundy">⚙️</button>
+
+  <header id="subbar" class="subbar hidden">
+    <button id="btn-back" class="back" aria-label="Späť">⬅️</button>
+    <button class="mic mic-small" aria-label="Hovor">🎤</button>
   </header>
 
-  <button id="btn-mic" class="mic" aria-label="Ťukni a povedz, čo chceš">
-    <span class="mic-icon">🎤</span>
-    <span id="mic-label" class="mic-label">Ťukni a povedz</span>
-  </button>
-
   <section id="screen-home" class="screen home">
-    <button class="tile t-family" data-action="contacts"><span class="ti">👨‍👩‍👧</span><span class="tl">Rodina</span></button>
-    <button class="tile t-help" data-action="help"><span class="ti">🆘</span><span class="tl">Pomoc</span></button>
-    <button class="tile t-radio" data-action="radio"><span class="ti">📻</span><span class="tl">Rádio</span></button>
-    <button class="tile t-read" data-action="read"><span class="ti">📚</span><span class="tl">Rozprávky a knihy</span></button>
-    <button class="tile t-music" data-action="music"><span class="ti">🎵</span><span class="tl">Hudba</span></button>
-    <button class="tile t-time" data-action="today"><span class="ti">🕒</span><span class="tl">Čas a program</span></button>
+    <button class="mic mic-big" aria-label="Hovor"><span class="mic-icon">🎤</span></button>
+    <button id="btn-menu" class="menu-btn" aria-label="Výber obrázkom">
+      <span class="mb-top">👨‍👩‍👧</span>
+      <span class="mb-bottom"><span>📻</span><span>🎵</span></span>
+    </button>
   </section>
 
-  <section id="screen-contacts" class="screen contacts hidden"></section>
-  <section id="screen-list" class="screen list hidden"></section>
-  <section id="screen-today" class="screen today hidden"></section>
+  <section id="screen-menu" class="screen menu hidden">
+    <button class="tile t-family" data-action="contacts" aria-label="Rodina">👨‍👩‍👧</button>
+    <button class="tile t-radio" data-action="radio" aria-label="Rádio">📻</button>
+    <button class="tile t-music" data-action="music" aria-label="Hudba">🎵</button>
+  </section>
+
+  <section id="screen-contacts" class="screen fill-grid hidden"></section>
+  <section id="screen-list" class="screen fill-grid hidden"></section>
 
   <div id="caption" class="caption hidden"></div>
 
   <div id="player" class="player hidden">
     <span id="player-icon" class="player-icon">📻</span>
-    <span id="player-title" class="player-title"></span>
     <button id="player-toggle" class="player-btn" aria-label="Pauza">⏸️</button>
     <button id="player-stop" class="player-btn stop" aria-label="Stop">⏹️</button>
   </div>
 </main>
 
 <!-- Pripomienka z kalendára – ťuknutie kamkoľvek ju potvrdí -->
-<div id="reminder" class="overlay reminder hidden">
+<div id="reminder" class="overlay reminder hidden" aria-label="Pripomienka">
   <div class="huge">⏰</div>
-  <div id="reminder-title" class="reminder-title"></div>
-  <div class="reminder-ok">👍 Ťukni, keď je hotovo</div>
+  <div class="reminder-ok">👍</div>
 </div>
 
 <!-- Po hovore o pomoc: dovolal sa? -->
 <div id="help-check" class="overlay help-check hidden">
-  <button id="help-ok" class="half ok"><span class="huge">✅</span><span>Áno, dovolal som sa</span></button>
-  <button id="help-backup" class="half backup"><span class="huge">📞</span><span id="help-backup-name">Zavolať záložný kontakt</span></button>
+  <button id="help-ok" class="half ok" aria-label="Áno, dovolal som sa"><span class="huge">✅</span></button>
+  <button id="help-backup" class="half backup" aria-label="Zavolať záložný kontakt">
+    <span class="huge">📞</span><span id="help-backup-photo" class="help-photo"></span>
+  </button>
 </div>
 
 <div id="settings" class="settings hidden"></div>

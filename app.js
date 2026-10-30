@@ -4,7 +4,7 @@
  * Všetky nastavenia (kontakty, fotky, rádiá, kalendár) sa ukladajú len v tomto telefóne.
  */
 
-const VERSION = '1.0';
+const VERSION = '1.2';
 
 // ===================== Nastavenia a úložisko =====================
 
@@ -25,6 +25,10 @@ const DEFAULTS = {
   allDayTime: '08:00',
   confirmTap: true,
   keepAwake: true,
+  showCaptions: false,   // titulky len pre rodinu – používateľ nečíta
+  contactsFromGoogle: false,
+  listenSeconds: 15,     // ako dlho čakať na hlasový povel
+  confirmSeconds: 15,    // koľko času na druhé ťuknutie pri volaní
   voiceURI: '',
   rate: 1.0,
   pin: '',
@@ -106,6 +110,7 @@ let speakSeq = 0;
 let captionTimer;
 
 function showCaption(text) {
+  if (!S.showCaptions) return;
   const c = $('caption');
   c.textContent = text;
   c.classList.remove('hidden');
@@ -303,8 +308,9 @@ function updatePlayerUI() {
     p.classList.add('hidden');
   } else {
     p.classList.remove('hidden');
-    $('player-icon').textContent = player.kind === 'radio' ? '📻' : player.item.cat === 'hudba' ? '🎵' : '📖';
-    $('player-title').textContent = player.item.name;
+    $('player-icon').replaceChildren(player.item.photo
+      ? h('img', { src: player.item.photo, alt: '', style: 'width:100%;max-height:11vh;object-fit:cover;border-radius:14px' })
+      : player.kind === 'radio' ? '📻' : player.item.cat === 'hudba' ? '🎵' : '📖');
     $('player-toggle').textContent = audio.paused ? '▶️' : '⏸️';
   }
   if (screen === 'list') renderList();
@@ -393,7 +399,7 @@ function checkHelpAfterCall() {
   if (!st || st.step !== 1 || st.asked || !back || Date.now() - st.t > HELP_WINDOW || Date.now() - st.t < 3000) return;
   st.asked = true;
   writeJSON('help', st);
-  $('help-backup-name').textContent = 'Zavolať: ' + back.name;
+  $('help-backup-photo').replaceChildren(faceOf(back));
   $('help-check').classList.remove('hidden');
   say(`Dovolal si sa? Ak áno, ťukni hore na zelené. Ak nie, ťukni dole na červené a zavolám ${back.voiceName || back.name}.`);
 }
@@ -409,10 +415,11 @@ function disarm() {
 }
 function confirmTap(key, el, prompt, action) {
   if (!S.confirmTap) return action();
-  if (armed && armed.key === key && Date.now() - armed.t < 8000) { disarm(); return action(); }
+  const ms = Math.max(5, S.confirmSeconds || 15) * 1000;
+  if (armed && armed.key === key && Date.now() - armed.t < ms) { disarm(); return action(); }
   disarm();
   el.classList.add('armed');
-  armed = { key, el, t: Date.now(), timer: setTimeout(disarm, 8000) };
+  armed = { key, el, t: Date.now(), timer: setTimeout(disarm, ms) };
   say(prompt);
 }
 
@@ -422,34 +429,41 @@ let screen = 'home';
 let listKind = null;
 const ITEM_COLORS = ['#7c3aed', '#ea580c', '#0d9488', '#2563eb', '#db2777', '#65a30d', '#ca8a04', '#0891b2'];
 
+// Obrazovky: home (mikrofón + výber), menu (Rodina, Rádio, Hudba), contacts, list.
+// Na obrazovkách nie je žiadny text – používateľ nečíta, všetko sa hovorí nahlas.
 function showScreen(name, kind) {
   screen = name;
   listKind = kind || null;
   disarm();
-  for (const s of ['home', 'contacts', 'list', 'today']) $('screen-' + s).classList.toggle('hidden', s !== name);
-  $('btn-back').classList.toggle('hidden', name === 'home');
-  $('app').classList.toggle('sub', name !== 'home');
+  for (const s of ['home', 'menu', 'contacts', 'list']) $('screen-' + s).classList.toggle('hidden', s !== name);
+  $('subbar').classList.toggle('hidden', name === 'home');
+  $('btn-settings').classList.toggle('hidden', name !== 'home');
   if (name === 'contacts') renderContacts();
   if (name === 'list') renderList();
-  if (name === 'today') renderToday();
 }
 
-function photoOrInitial(obj, cls, fallbackEmoji) {
-  if (obj.photo) return h('img', { class: cls, src: obj.photo, alt: '' });
-  return h('div', { class: cls }, fallbackEmoji || initial(obj.name));
+// Späť: z kontaktov a zoznamov do výberu, z výberu domov.
+function goBack() {
+  stopSpeaking();
+  showScreen(screen === 'contacts' || screen === 'list' ? 'menu' : 'home');
 }
+
+// Mriežka vyplní celú obrazovku – čím menej položiek, tým väčšie obrázky.
+function fitGrid(box, n) {
+  const cols = n <= 2 ? 1 : n <= 6 ? 2 : 3;
+  box.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  box.style.gridTemplateRows = `repeat(${Math.max(1, Math.ceil(n / cols))}, 1fr)`;
+}
+
+const faceOf = c => c.photo ? h('img', { src: c.photo, alt: '' }) : h('span', { class: 'noface' }, '👤');
 
 function renderContacts() {
   const box = $('screen-contacts');
   box.replaceChildren();
-  if (!S.contacts.length) {
-    box.append(h('div', { class: 'empty', style: 'grid-column: 1 / -1' }, 'Zatiaľ žiadne kontakty. Rodina ich pridá v nastaveniach (podržať ⚙️).'));
-    return;
-  }
+  fitGrid(box, S.contacts.length);
+  if (!S.contacts.length) { box.append(h('div', { class: 'empty' }, '👤')); return; }
   for (const c of S.contacts) {
-    const el = h('button', { class: 'person', style: `--c:${c.color || COLORS[0]}` },
-      photoOrInitial(c, 'photo'),
-      h('div', { class: 'name' }, c.name));
+    const el = h('button', { class: 'person', style: `--c:${c.color || COLORS[0]}`, 'aria-label': c.name }, faceOf(c));
     el.addEventListener('click', () =>
       confirmTap('c:' + c.id, el, `${c.name}. Ťukni ešte raz a zavolám.`, () => callContact(c)));
     box.append(el);
@@ -461,16 +475,12 @@ function renderList() {
   const items = listKind === 'radio' ? S.stations : lib(listKind);
   const emoji = listKind === 'radio' ? '📻' : listKind === 'hudba' ? '🎵' : '📖';
   box.replaceChildren();
-  if (!items.length) {
-    box.append(h('div', { class: 'empty' }, 'Zatiaľ tu nič nie je. Rodina to pridá v nastaveniach (podržať ⚙️).'));
-    return;
-  }
+  fitGrid(box, items.length);
+  if (!items.length) { box.append(h('div', { class: 'empty' }, emoji)); return; }
   items.forEach((it, i) => {
     const current = player.item && player.item.id === it.id;
-    const el = h('button', { class: 'item' + (current ? ' playing' : ''), style: `--c:${ITEM_COLORS[i % ITEM_COLORS.length]}` },
-      it.photo ? h('img', { src: it.photo, alt: '', style: 'width:72px;height:72px;border-radius:12px;object-fit:cover' }) : h('span', { class: 'ii' }, emoji),
-      h('span', { class: 'it' }, it.name),
-      current && h('span', { class: 'ii' }, audio.paused ? '⏸️' : '🔊'));
+    const el = h('button', { class: 'item' + (current ? ' playing' : ''), style: `--c:${ITEM_COLORS[i % ITEM_COLORS.length]}`, 'aria-label': it.name },
+      it.photo ? h('img', { src: it.photo, alt: '' }) : h('span', { class: 'ii' }, emoji));
     el.addEventListener('click', () => {
       if (current) { if (audio.paused) player.resume(); else player.pause(); return; }
       if (listKind === 'radio') playStation(it); else playLib(it);
@@ -488,23 +498,53 @@ function parseDay(s) { const [y, m, d] = s.split('-').map(Number); return new Da
 const evStart = ev => ev.allDay ? parseDay(ev.start).getTime() : Date.parse(ev.start);
 const evEnd = ev => ev.allDay ? parseDay(ev.end).getTime() : Date.parse(ev.end);
 
-async function fetchCalendar() {
-  if (!S.calendarUrl) return { ok: false, msg: 'Adresa kalendára nie je vyplnená.' };
+const CONTACTS_EVERY = 60 * 60e3;   // kontakty z Google stačí obnoviť raz za hodinu
+
+// Jeden skript Google vracia udalosti z kalendára a (na požiadanie) kontakty so štítkom „Pomocník“.
+async function fetchCalendar(forceContacts = false) {
+  if (!S.calendarUrl) return { ok: false, msg: 'Adresa skriptu nie je vyplnená.' };
+  const wantContacts = S.contactsFromGoogle && (forceContacts || Date.now() - readJSON('contactsSyncAt', 0) > CONTACTS_EVERY);
   try {
     const u = new URL(S.calendarUrl.trim());
     if (S.calendarToken) u.searchParams.set('t', S.calendarToken.trim());
+    if (wantContacts) u.searchParams.set('contacts', '1');
     u.searchParams.set('_', Date.now());
     const r = await fetch(u, { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json();
     if (j.error) throw new Error(j.error === 'unauthorized' ? 'nesprávny kľúč (token)' : j.error);
-    calCache = { events: j.events || [], at: Date.now() };
-    writeJSON('calendar', calCache);
-    if (screen === 'today') renderToday();
-    return { ok: true, count: calCache.events.length };
+    const res = { ok: true, count: 0, calendarError: j.calendarError, contactsError: j.contactsError };
+    if (j.events) {
+      calCache = { events: j.events, at: Date.now() };
+      writeJSON('calendar', calCache);
+      res.count = j.events.length;
+    }
+    if (wantContacts && j.contacts) {
+      applyGoogleContacts(j.contacts);
+      res.contacts = j.contacts.length;
+    } else if (wantContacts && !j.contactsError) {
+      res.contactsError = 'skript neposlal kontakty – je nasadená nová verzia skriptu?';
+    }
+    return res;
   } catch (e) {
     return { ok: false, msg: e.message };
   }
+}
+
+// Kontakty z Google nahradia zoznam v telefóne. Farba a fotka nahratá v telefóne zostanú,
+// ak ich Google nemá; ID (resourceName) je stále, takže výber „Pomoc“ sa zachová.
+function applyGoogleContacts(list) {
+  const old = new Map(S.contacts.map(c => [c.id, c]));
+  S.contacts = list.map((c, i) => {
+    const o = old.get(c.id) || {};
+    return {
+      id: c.id, name: c.name, aliases: c.aliases || '', voiceName: c.voiceName || '', phone: c.phone,
+      photo: c.photo || o.photo || '', color: o.color || COLORS[i % COLORS.length], google: true,
+    };
+  });
+  saveSettings();
+  writeJSON('contactsSyncAt', Date.now());
+  if (screen === 'contacts' && $('settings').classList.contains('hidden')) renderContacts();
 }
 
 function todayEvents() {
@@ -512,17 +552,6 @@ function todayEvents() {
   const from = s.getTime(), to = from + 86400e3;
   return (calCache.events || []).filter(ev => { const t = evStart(ev); return t >= from && t < to; })
     .sort((a, b) => (b.allDay - a.allDay) || evStart(a) - evStart(b));
-}
-
-function renderToday() {
-  const box = $('screen-today');
-  const now = new Date();
-  box.replaceChildren(
-    h('div', { class: 'big-time' }, `${now.getHours()}:${pad(now.getMinutes())}`),
-    h('div', { class: 'big-date' }, `${DAYS[now.getDay()]} ${now.getDate()}. ${MONTHS[now.getMonth()]}`),
-    ...todayEvents().map(ev => h('div', { class: 'ev' + (!ev.allDay && evEnd(ev) < now.getTime() ? ' past' : '') },
-      h('span', { class: 't' }, ev.allDay ? '📌' : hm(evStart(ev))),
-      h('span', {}, ev.title))));
 }
 
 function speakToday() {
@@ -570,7 +599,6 @@ function nextReminder() {
   }
   if (player.playing) { remWasPlaying = true; player.pause(); }
   remCurrent.count = 0;
-  $('reminder-title').textContent = remCurrent.title;
   $('reminder').classList.remove('hidden');
   announceReminder();
 }
@@ -597,55 +625,82 @@ $('reminder').addEventListener('click', async () => {
 // ===================== Rozpoznávanie reči =====================
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null;
+let listening = null;          // { cancel } počas počúvania
+const SETTLE_MS = 2000;        // po vete ešte chvíľu čakáme, či používateľ nepokračuje
+
+const LISTEN_ERRORS = {
+  'network': 'Na počúvanie treba internet. Ťukni radšej na obrázok.',
+  'not-allowed': 'Pomocník nemá povolený mikrofón. Požiadaj rodinu o pomoc.',
+  'service-not-allowed': 'Pomocník nemá povolený mikrofón. Požiadaj rodinu o pomoc.',
+};
 
 function setMic(on) {
-  $('btn-mic').classList.toggle('listening', on);
-  $('mic-label').textContent = on ? 'Počúvam…' : 'Ťukni a povedz';
+  for (const m of document.querySelectorAll('.mic')) m.classList.toggle('listening', on);
 }
 
+// Počúva až S.listenSeconds sekúnd. Chrome sám končí po pár sekundách ticha,
+// preto rozpoznávanie v tom čase znova spúšťame, kým používateľ niečo nepovie.
 async function listen() {
   disarm();
-  if (rec) { rec.abort(); return; }
+  if (listening) { listening.cancel(); return; }
   if (!SR) return say('Tento prehliadač nevie počúvať. Otvor Pomocníka v aplikácii Chrome.');
   stopSpeaking();
   const wasPlaying = player.playing;
   if (wasPlaying) player.pause();
   await beep(880, .12);
-  const r = rec = new SR();
-  r.lang = 'sk-SK';
-  r.interimResults = false;
-  r.maxAlternatives = 5;
-  r.continuous = false;
-  let handled = false;
-  r.onresult = e => {
-    handled = true;
-    const alts = Array.from(e.results[0]).map(a => a.transcript);
-    handleSpeech(alts, wasPlaying);
-  };
-  r.onerror = e => {
-    handled = true;
-    if (e.error === 'aborted') { if (wasPlaying) player.resume(); return; }
-    const msg = {
-      'no-speech': 'Nič nebolo počuť. Ťukni na mikrofón a skús to znova.',
-      'network': 'Na počúvanie treba internet. Ťukni radšej na obrázok.',
-      'not-allowed': 'Pomocník nemá povolený mikrofón. Požiadaj rodinu o pomoc.',
-      'service-not-allowed': 'Pomocník nemá povolený mikrofón. Požiadaj rodinu o pomoc.',
-    }[e.error] || 'Počúvanie nefunguje. Skús to znova.';
-    say(msg).then(() => { if (wasPlaying) player.resume(); });
-  };
-  r.onend = () => {
-    rec = null;
+
+  const deadline = Date.now() + Math.max(5, S.listenSeconds || 15) * 1000;
+  const heard = [];            // doteraz povedané časti vety
+  let alts = null, done = false, settle = null, r = null;
+
+  // end(alternatívy) = spracuj; end(null) = nič nepočul; end(null, null) = zrušené ťuknutím
+  const end = (result, msg) => {
+    if (done) return;
+    done = true;
+    listening = null;
     setMic(false);
-    if (!handled) say('Nič nebolo počuť. Ťukni na mikrofón a skús to znova.').then(() => { if (wasPlaying) player.resume(); });
+    clearTimeout(settle);
+    clearTimeout(timer);
+    if (r) { r.onend = null; try { r.abort(); } catch { /* */ } }
+    if (result) return handleSpeech(result, wasPlaying);
+    if (msg === null) { if (wasPlaying) player.resume(); return; }
+    say(msg || 'Nič nebolo počuť. Ťukni na mikrofón a skús to znova.').then(() => { if (wasPlaying) player.resume(); });
   };
-  try {
+  const timer = setTimeout(() => end(alts), deadline - Date.now());
+
+  const start = () => {
+    r = new SR();
+    r.lang = 'sk-SK';
+    r.interimResults = false;
+    r.maxAlternatives = 5;
+    r.continuous = true;
+    r.onresult = e => {
+      const res = e.results[e.results.length - 1];
+      if (!res.isFinal) return;
+      const prefix = heard.join(' ');
+      alts = Array.from(res).map(a => (prefix + ' ' + a.transcript).trim());
+      heard.push(res[0].transcript);
+      clearTimeout(settle);
+      settle = setTimeout(() => end(alts), SETTLE_MS);
+    };
+    r.onerror = e => {
+      if (e.error === 'no-speech' || e.error === 'aborted') return;   // onend počúvanie obnoví
+      end(null, LISTEN_ERRORS[e.error] || 'Počúvanie nefunguje. Skús to znova.');
+    };
+    r.onend = () => {
+      if (done) return;
+      if (Date.now() < deadline - 500) {
+        try { start(); } catch { end(alts); }
+      } else {
+        end(alts);
+      }
+    };
     r.start();
-    setMic(true);
-  } catch {
-    rec = null;
-    setMic(false);
-  }
+  };
+
+  listening = { cancel: () => end(null, null) };
+  setMic(true);
+  try { start(); } catch { end(null, 'Počúvanie nefunguje. Skús to znova.'); }
 }
 
 // ===================== Porozumenie povelom =====================
@@ -701,6 +756,13 @@ function bestMatch(items, tk, scorer, margin = 0) {
   return { item: ranked[0].it, score: ranked[0].s, tie: ranked[1] && ranked[1].s >= ranked[0].s - margin ? ranked[1].it : null };
 }
 const CONTACT_MARGIN = 10;
+// Kontakty z Google majú často celé meno („Janko Novák“) – stačí, keď zaznie krstné meno.
+function contactScore(name, tk) {
+  const full = phraseScore(name, tk);
+  if (full) return full;
+  const first = tokens(name)[0] || '';
+  return first.length >= 3 ? wordScore(first, tk) : 0;
+}
 
 function interpret(text) {
   const tk = tokens(text);
@@ -715,7 +777,7 @@ function interpret(text) {
   if (has(tk, 'dalsi', 'dalsiu', 'dalsie') || hasWord(tk, 'inu', 'ine', 'ina')) return { type: 'next' };
 
   if (has(tk, 'zavol', 'volaj', 'vytoc', 'telefon', 'zatelefon')) {
-    const m = bestMatch(S.contacts, rest, phraseScore, CONTACT_MARGIN);
+    const m = bestMatch(S.contacts, rest, contactScore, CONTACT_MARGIN);
     return m ? { type: 'call', m } : { type: 'contacts' };
   }
   const st = bestMatch(S.stations, rest, titleScore);
@@ -739,7 +801,7 @@ function interpret(text) {
   // Pri „pusti …“ má prednosť názov („pusti Janka Hraška“ nie je volanie Jankovi).
   const playVerb = has(tk, 'pust', 'zapni', 'hraj', 'zahraj');
   const l = bestMatch(S.library, rest, titleScore);
-  const c = !playVerb && bestMatch(S.contacts, rest, phraseScore, CONTACT_MARGIN);
+  const c = !playVerb && bestMatch(S.contacts, rest, contactScore, CONTACT_MARGIN);
   if (l && (playVerb || !c || l.score > c.score)) return { type: 'play', cat: l.item.cat, item: l.item };
   if (c) return { type: 'call', m: c };
   if (l) return { type: 'play', cat: l.item.cat, item: l.item };
@@ -778,7 +840,7 @@ async function run(r, wasPlaying) {
     case 'volume': await say('Hlasitosť sa mení tlačidlami na boku telefónu.'); break;
     case 'time': await say(timeSentence()); break;
     case 'date': await say(dateSentence()); break;
-    case 'today': showScreen('today'); await speakToday(); break;
+    case 'today': await speakToday(); break;
     case 'info': await say(HELP_TEXT); break;
     case 'home': showScreen('home'); break;
   }
@@ -792,11 +854,6 @@ const TILES = {
     showScreen('contacts');
     say(S.contacts.length ? 'Rodina. Ťukni na fotku alebo povedz meno.' : 'Zatiaľ tu nie sú žiadne kontakty.');
   },
-  help(el) {
-    const t = contactById(S.helpPrimary) || contactById(S.helpBackup);
-    if (!t) return say('Pomoc zatiaľ nie je nastavená. Požiadaj rodinu, nech ju nastaví.');
-    confirmTap('help', el, `Pomoc. Ťukni ešte raz a zavolám ${t.voiceName || t.name}.`, callHelp);
-  },
   radio() {
     if (S.stations.length === 1) {
       const st = S.stations[0];
@@ -807,25 +864,21 @@ const TILES = {
     showScreen('list', 'radio');
     say('Rádio. Ťukni na stanicu.');
   },
-  read() {
-    showScreen('list', 'citanie');
-    say('Rozprávky a knihy. Ťukni na obrázok alebo povedz názov.');
-  },
   music() {
     showScreen('list', 'hudba');
     say('Hudba. Ťukni na obrázok alebo povedz názov.');
   },
-  today() {
-    showScreen('today');
-    speakToday();
-  },
 };
 
 for (const el of document.querySelectorAll('.tile')) {
-  el.addEventListener('click', () => { if (armed && armed.el !== el) disarm(); TILES[el.dataset.action](el); });
+  el.addEventListener('click', () => TILES[el.dataset.action](el));
 }
-$('btn-mic').addEventListener('click', listen);
-$('btn-back').addEventListener('click', () => { showScreen('home'); stopSpeaking(); });
+for (const el of document.querySelectorAll('.mic')) el.addEventListener('click', listen);
+$('btn-menu').addEventListener('click', () => {
+  showScreen('menu');
+  say('Vyber: rodina, rádio, alebo hudba.');
+});
+$('btn-back').addEventListener('click', goBack);
 $('player-toggle').addEventListener('click', () => { if (audio.paused) player.resume(); else player.pause(); });
 $('player-stop').addEventListener('click', () => { player.stop(); say('Vypnuté.'); });
 
@@ -855,14 +908,6 @@ async function keepAwake() {
   if (!S.keepAwake || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
   try { wakeLock = await navigator.wakeLock.request('screen'); } catch { /* */ }
 }
-
-function tickClock() {
-  const d = new Date();
-  $('clock').textContent = `${d.getHours()}:${pad(d.getMinutes())}`;
-  if (screen === 'today' && $('settings').classList.contains('hidden')) renderToday();
-}
-tickClock();
-setInterval(tickClock, 10e3);
 
 let started = false;
 $('start').addEventListener('click', async () => {
@@ -968,6 +1013,31 @@ function contactSelect(label, key) {
 }
 
 function settingsContacts() {
+  if (S.contactsFromGoogle) {
+    const status = h('div', { class: 'status' });
+    const at = readJSON('contactsSyncAt', 0);
+    return [
+      h('h2', {}, '👨‍👩‍👧 Kontakty (z Google Kontaktov)'),
+      h('p', { class: 'hint' }, 'Kontakty sa načítavajú z Google Kontaktov so štítkom „Pomocník“, asi raz za hodinu. ' +
+        'Meno, číslo, fotku, prezývku (= ďalšie oslovenia, napr. „syn, synovi, Jankovi“) a vlastné polia „Volanie“ a „Poradie“ ' +
+        'upravujte v Google Kontaktoch. Tu sa dá zmeniť len farba rámčeka.'),
+      h('div', { class: 'card' },
+        h('div', { class: 'hint', style: 'margin:0' }, at ? `Naposledy načítané: ${new Date(at).toLocaleString('sk-SK')}` : 'Zatiaľ nenačítané.'),
+        h('div', { class: 'row' }, btn('🔄 Načítať kontakty teraz', async () => {
+          status.className = 'status'; status.textContent = 'Načítavam…';
+          const r = await fetchCalendar(true);
+          if (!r.ok || r.contactsError) { status.className = 'status bad'; status.textContent = 'Chyba: ' + (r.msg || r.contactsError); return; }
+          renderSettings();
+        }, 'primary')),
+        status),
+      S.contacts.map(c => h('div', { class: 'card' },
+        h('div', { class: 'contact-head' }, thumb(c),
+          h('div', { class: 'grow' }, h('b', {}, c.name), h('div', {}, c.phone),
+            c.aliases && h('div', { class: 'hint', style: 'margin:2px 0 0' }, 'Oslovenia: ' + c.aliases),
+            c.voiceName && h('div', { class: 'hint', style: 'margin:2px 0 0' }, 'Pri volaní: „Volám ' + c.voiceName + '“')),
+          h('input', { type: 'color', value: c.color || COLORS[0], style: 'width:56px;height:44px', oninput: e => { c.color = e.target.value; saveSettings(); } })))),
+    ];
+  }
   return [
     h('h2', {}, '👨‍👩‍👧 Kontakty'),
     h('p', { class: 'hint' }, 'Do „ďalších oslovení“ napíšte, ako tomu človeku hovorí, aj s tvarmi, ktoré povie pri volaní ' +
@@ -999,7 +1069,7 @@ function settingsContacts() {
 function settingsHelp() {
   return [
     h('h2', {}, '🆘 Pomoc'),
-    h('p', { class: 'hint' }, 'Na povel „Pomoc“ (alebo dvojité ťuknutie na červenú dlaždicu) sa volá hlavný kontakt. ' +
+    h('p', { class: 'hint' }, 'Na hlasový povel „Pomoc“ sa volá hlavný kontakt. ' +
       'Keď sa nedovolá, po návrate z hovoru ponúkne záložný kontakt. Číslo 112 sa nevolá.'),
     h('div', { class: 'card' }, contactSelect('Hlavný kontakt', 'helpPrimary'), contactSelect('Záložný kontakt', 'helpBackup')),
   ];
@@ -1081,21 +1151,34 @@ function settingsLibrary() {
 function settingsCalendar() {
   const status = h('div', { class: 'status' });
   return [
-    h('h2', {}, '📅 Kalendár a pripomienky'),
-    h('p', { class: 'hint' }, 'Udalosti sa čítajú z Google Kalendára cez malý skript (návod je v súbore NAVOD.md). ' +
-      'V čase udalosti telefón zazvoní a prečíta jej názov, napr. „Ranné lieky“.'),
+    h('h2', {}, '📅 Google: kalendár a kontakty'),
+    h('p', { class: 'hint' }, 'Udalosti z Google Kalendára a kontakty z Google Kontaktov sa čítajú cez malý skript ' +
+      '(návod je v súbore NAVOD.md). V čase udalosti telefón zazvoní a prečíta jej názov, napr. „Ranné lieky“.'),
     h('div', { class: 'card' },
       field('Adresa skriptu (končí na /exec)', S, 'calendarUrl', 'url', { placeholder: 'https://script.google.com/macros/s/…/exec' }),
       field('Kľúč (TOKEN zo skriptu)', S, 'calendarToken'),
-      h('div', { class: 'row' }, btn('🔄 Otestovať kalendár', async () => {
+      h('label', { class: 'check' },
+        h('input', { type: 'checkbox', checked: S.contactsFromGoogle, onchange: e => {
+          if (e.target.checked && S.contacts.length &&
+            !confirm('Kontakty v telefóne sa nahradia kontaktmi z Google so štítkom „Pomocník“. Pokračovať?')) {
+            e.target.checked = false; return;
+          }
+          S.contactsFromGoogle = e.target.checked;
+          if (!S.contactsFromGoogle) S.contacts.forEach(c => { delete c.google; });
+          saveSettings(); renderSettings();
+        } }),
+        'Kontakty brať z Google Kontaktov (štítok „Pomocník“)'),
+      h('div', { class: 'row' }, btn('🔄 Otestovať spojenie', async () => {
         status.className = 'status';
         status.textContent = 'Načítavam…';
-        const r = await fetchCalendar();
+        const r = await fetchCalendar(true);
         if (!r.ok) { status.className = 'status bad'; status.textContent = 'Chyba: ' + r.msg; return; }
         const next = (calCache.events || []).filter(ev => evEnd(ev) > Date.now()).slice(0, 6)
           .map(ev => `• ${ev.allDay ? ev.start + ' (celý deň)' : new Date(evStart(ev)).toLocaleString('sk-SK')} – ${ev.title}`);
-        status.className = 'status ok';
-        status.textContent = `V poriadku, načítaných udalostí: ${r.count}\n` + next.join('\n');
+        const lines = [r.calendarError ? 'Kalendár – chyba: ' + r.calendarError : `Kalendár v poriadku, udalostí: ${r.count}`, ...next];
+        if (S.contactsFromGoogle) lines.push(r.contactsError ? 'Kontakty – chyba: ' + r.contactsError : `Kontakty v poriadku, načítaných: ${r.contacts}`);
+        status.className = 'status ' + (r.calendarError || r.contactsError ? 'bad' : 'ok');
+        status.textContent = lines.join('\n');
       })),
       status,
       check('Čítať aj popis udalosti', S, 'readDescription'),
@@ -1121,8 +1204,11 @@ function settingsVoice() {
       h('label', {}, 'Hlas'), sel,
       h('label', {}, 'Rýchlosť reči'), rate,
       h('div', { class: 'row' }, btn('▶️ Vyskúšať hlas', () => say('Dobrý deň. Toto je skúška hlasu. ' + timeSentence()))),
+      field('Ako dlho čakať na hlasový povel (sekúnd)', S, 'listenSeconds', 'number', { min: 5, max: 60 }),
       check('Telefonovať až po druhom ťuknutí na fotku (chráni pred omylom)', S, 'confirmTap'),
+      field('Čas na druhé ťuknutie (sekúnd)', S, 'confirmSeconds', 'number', { min: 5, max: 60 }),
       check('Displej nezhasína, kým je Pomocník otvorený', S, 'keepAwake'),
+      check('Zobrazovať titulky – čo telefón hovorí (len pre rodinu)', S, 'showCaptions'),
       field('PIN na otvorenie nastavení (prázdne = bez PIN)', S, 'pin', 'password', { inputMode: 'numeric', autocomplete: 'off' })),
   ];
 }
