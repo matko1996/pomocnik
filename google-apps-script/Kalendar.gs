@@ -2,14 +2,13 @@
  * Pomocník – sprístupní aplikácii v telefóne udalosti z Google Kalendára a kontakty z Google Kontaktov.
  *
  * 1. TOKEN zmeňte na vlastný náhodný text (napr. 20 písmen a číslic) a ten istý zadajte v Pomocníkovi.
- * 2. CALENDAR_ID: 'primary' = hlavný kalendár účtu. Lepšie je založiť samostatný kalendár
- *    (napr. „Pomocník“) a sem vložiť jeho ID z Nastavenia kalendára → Integrovať kalendár.
+ * 2. CALENDAR_NAME: názov kalendára v Google Kalendári, z ktorého sa čítajú pripomienky (založte ho, ak ho nemáte).
  * 3. CONTACT_LABEL: štítok v Google Kontaktoch. Do Pomocníka sa načítajú len kontakty s týmto štítkom.
  *    Pre kontakty treba vľavo pri „Služby“ pridať „People API“.
  * 4. Nasadiť → Nové nasadenie → Webová aplikácia: Spúšťať ako „Ja“, Prístup „Ktokoľvek“.
  */
 const TOKEN = 'ZMENTE-MA-NA-NAHODNY-TEXT';
-const CALENDAR_ID = 'primary';
+const CALENDAR_NAME = 'Pomocník';
 const DAYS_AHEAD = 3;
 const CONTACT_LABEL = 'Pomocník';
 
@@ -34,10 +33,8 @@ function doGet(e) {
 }
 
 function events_() {
-  const cal = CALENDAR_ID === 'primary'
-    ? CalendarApp.getDefaultCalendar()
-    : CalendarApp.getCalendarById(CALENDAR_ID);
-  if (!cal) throw new Error('Kalendár sa nenašiel – skontrolujte CALENDAR_ID.');
+  const cal = CalendarApp.getCalendarsByName(CALENDAR_NAME)[0];
+  if (!cal) throw new Error('Kalendár „' + CALENDAR_NAME + '“ sa nenašiel – založte ho v Google Kalendári.');
 
   const tz = Session.getScriptTimeZone();
   const now = new Date();
