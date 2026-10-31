@@ -89,8 +89,7 @@ Rodina pak může vše měnit na dálku ze svého telefonu nebo počítače a Po
 2. Smažte ukázkový kód a vložte obsah souboru `google-apps-script/Kalendar.gs`.
 3. V kódu změňte:
    - `TOKEN` na vlastní náhodný text (např. `k8Fq2mZt7pLx9wRb`),
-   - `CALENDAR_ID` na ID kalendáře „Pomocník“ (Google Kalendář → Nastavenia kalendára → Integrovať kalendár → ID kalendára),
-   - `CONTACT_LABEL` jen pokud se štítek jmenuje jinak než `Pomocník`.
+   - `CALENDAR_NAME` a `CONTACT_LABEL` jen pokud se kalendář nebo štítek jmenují jinak než `Pomocník`.
 4. Vlevo u **Služby** klikněte na **+** a přidejte **People API** (potřeba pro kontakty).
 5. Ozubené kolečko **Nastavenia projektu** → Časové pásmo **(GMT+01:00) Bratislava**.
 6. **Nasadiť → Nové nasadenie** → typ **Webová aplikácia** → Spúšťať ako **Ja** → Kto má prístup **Ktokoľvek** → Nasadiť → povolit přístup ke kalendáři a kontaktům.
