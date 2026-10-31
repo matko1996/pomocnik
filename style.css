@@ -80,7 +80,7 @@ button { font: inherit; color: inherit; border: 0; cursor: pointer; touch-action
   font-size: min(36vw, 17vh, 220px); line-height: 1;
 }
 .tile:active { filter: brightness(1.3); }
-.t-family { background: var(--family); }
+.t-bible { background: #b45309; }
 .t-radio { background: var(--radio); }
 .t-music { background: var(--music); }
 
@@ -95,7 +95,6 @@ button { font: inherit; color: inherit; border: 0; cursor: pointer; touch-action
 .person { border: 6px solid var(--c, var(--family)); background: var(--c, var(--family)); padding: 0; }
 .person img, .item img { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; display: block; }
 .person .noface, .item .ii { font-size: min(22vw, 12vh, 160px); line-height: 1; }
-.item.playing { outline: 10px solid var(--select); outline-offset: -10px; }
 .empty { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; font-size: min(40vw, 30vh); opacity: .5; }
 
 /* ---------- Titulky (len pre rodinu, zapínajú sa v nastaveniach) a prehrávač ---------- */
@@ -105,13 +104,20 @@ button { font: inherit; color: inherit; border: 0; cursor: pointer; touch-action
   background: rgba(0, 0, 0, .85); color: #fff; font-size: 18px; line-height: 1.3; text-align: center;
   max-height: 20vh; overflow: hidden;
 }
-.player {
-  display: flex; align-items: center; gap: var(--gap);
-  padding: 8px; border-radius: 24px; background: var(--panel); height: 13vh; min-height: 84px;
+/* Hrá hudba, Biblia alebo rádio: hore čo hrá, pod tým obrovské červené Stop */
+.playing { z-index: 45; background: var(--bg); padding: calc(env(safe-area-inset-top) + var(--gap)) var(--gap) calc(env(safe-area-inset-bottom) + var(--gap)); gap: var(--gap); }
+.playing-icon {
+  flex: 1; width: 100%; display: flex; align-items: center; justify-content: center;
+  font-size: min(36vw, 20vh, 220px); border-radius: 32px; background: var(--panel); animation: pulse 2.5s infinite;
 }
-.player-icon { font-size: min(14vw, 8vh, 80px); width: 22%; text-align: center; }
-.player-btn { flex: 1; height: 100%; font-size: min(14vw, 8vh, 80px); border-radius: 20px; background: #475569; }
-.player-btn.stop { background: var(--help); }
+.playing-icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 32px; }
+.playing-stop {
+  flex: 2; width: 100%; border-radius: 32px; background: var(--help); font-size: min(50vw, 30vh, 300px);
+  box-shadow: 0 6px 0 #7f1d1d;
+}
+.playing-stop:active { transform: translateY(3px); box-shadow: 0 3px 0 #7f1d1d; }
+.playing-stop { display: flex; align-items: center; justify-content: center; }
+.stop-square { width: min(40vw, 24vh); height: min(40vw, 24vh); background: #fff; border-radius: 20px; }
 
 /* ---------- Prekrytia ---------- */
 .overlay {

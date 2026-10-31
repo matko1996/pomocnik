@@ -29,28 +29,27 @@
   <section id="screen-home" class="screen home">
     <button class="mic mic-big" aria-label="Hovor"><span class="mic-icon">🎤</span></button>
     <button id="btn-menu" class="menu-btn" aria-label="Výber obrázkom">
-      <span class="mb-top">👨‍👩‍👧</span>
+      <span class="mb-top">✝️</span>
       <span class="mb-bottom"><span>📻</span><span>🎵</span></span>
     </button>
   </section>
 
   <section id="screen-menu" class="screen menu hidden">
-    <button class="tile t-family" data-action="contacts" aria-label="Rodina">👨‍👩‍👧</button>
-    <button class="tile t-radio" data-action="radio" aria-label="Rádio">📻</button>
+    <button class="tile t-bible" data-action="bible" aria-label="Biblia">✝️</button>
+    <button class="tile t-radio" data-action="radio" aria-label="Rádio Lumen">📻</button>
     <button class="tile t-music" data-action="music" aria-label="Hudba">🎵</button>
   </section>
 
   <section id="screen-contacts" class="screen fill-grid hidden"></section>
-  <section id="screen-list" class="screen fill-grid hidden"></section>
 
   <div id="caption" class="caption hidden"></div>
-
-  <div id="player" class="player hidden">
-    <span id="player-icon" class="player-icon">📻</span>
-    <button id="player-toggle" class="player-btn" aria-label="Pauza">⏸️</button>
-    <button id="player-stop" class="player-btn stop" aria-label="Stop">⏹️</button>
-  </div>
 </main>
+
+<!-- Kým niečo hrá: len obrovské tlačidlo Stop, po ňom návrat na úvodnú obrazovku -->
+<div id="playing" class="overlay playing hidden">
+  <div id="playing-icon" class="playing-icon">🎵</div>
+  <button id="playing-stop" class="playing-stop" aria-label="Zastaviť"><span class="stop-square"></span></button>
+</div>
 
 <!-- Pripomienka z kalendára – ťuknutie kamkoľvek ju potvrdí -->
 <div id="reminder" class="overlay reminder hidden" aria-label="Pripomienka">

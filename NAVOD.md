@@ -10,25 +10,31 @@ Adresa aplikace: **https://matko1996.github.io/pomocnik/**
 **Úvodní obrazovka** má jen dvě obrovská tlačítka:
 
 - 🎤 **zelený mikrofon**: ťukne a řekne povel. Telefon čeká až 15 sekund a zvládne i pauzu uprostřed věty.
-- 👨‍👩‍👧📻🎵 **modré tlačítko s obrázky**: výběr ťuknutím. Otevře tři velké dlaždice:
-  - 👨‍👩‍👧 **Rodina**: fotky kontaktů přes celou obrazovku. První ťuknutí řekne jméno, druhé (do 15 sekund) zavolá.
-  - 📻 **Rádio**: zapne nebo vypne Rádio Lumen.
-  - 🎵 **Hudba**: seznam nahrané hudby.
+- ✝️📻🎵 **modré tlačítko s obrázky**: výběr ťuknutím. Otevře tři velké dlaždice:
+  - ✝️ **Biblia**: náhodná nahrávka ze skupiny Biblia,
+  - 📻 **Rádio Lumen**,
+  - 🎵 **Hudba**: náhodná nahrávka ze skupiny Hudba.
 
-Na dalších obrazovkách je nahoře velká šipka ⬅️ zpět a menší mikrofon 🎤.
+**Když něco hraje**, celou obrazovku zabere obrovské červené tlačítko **Stop** (nahoře je obrázek, co hraje).
+Nahrávky Biblie i hudby se náhodně střídají jedna za druhou, dokud uživatel Stop nestiskne.
+Po stisku Stop se Pomocník vrátí na úvodní obrazovku.
 
 ### Hlasové povely (příklady)
 
 | Povel | Co se stane |
 |---|---|
-| „Zavolaj Jankovi“, „Zavolaj mame“, nebo jen „Janko“ | otevře volání; pak stačí ťuknout na zelené sluchátko |
+| „Zavolaj Jankovi“, „Zavolaj kontakt Janko“, „Zavolaj mame“, nebo jen „Janko“ | volá přímo ten kontakt (v aplikaci pro Android bez obrazovky vytáčení) |
+| „Zavolaj“ (bez jména) | ukáže fotky kontaktů; první ťuknutí řekne jméno, druhé zavolá |
 | „Pomoc“, „Pomôž mi“, „Je mi zle“ | volá hlavní kontakt pro pomoc; při dalším „Pomoc“ do 10 minut volá záložní |
-| „Pusti rádio“, „Vypni“, „Stop“ | Rádio Lumen |
-| „Pusti rozprávku“, „Pusti Janka Hraška“, „Pusti hudbu“, „Ďalšiu“, „Pokračuj“ | rozprávky, audioknihy, hudba (knihy si pamatují, kde skončily) |
+| „Rádio“ | Rádio Lumen |
+| „Rádio Regina“ (rádio + název) | stanice s tímto názvem ze seznamu rádií v nastavení |
+| „Biblia“, „Bible“ | náhodné nahrávky Biblie |
+| „Hudba“, „Hudbu“ | náhodná hudba |
+| „Ďalšiu“ | další náhodná nahrávka |
 | „Koľko je hodín“, „Aký je dnes deň“, „Čo mám dnes“ | čas, datum, dnešní program z kalendáře |
 | „Čo vieš?“ | přečte nápovědu |
 
-Pomoc a rozprávky jsou dostupné jen hlasem (ve výběru obrázky jsou jen Rodina, Rádio, Hudba).
+Fotky kontaktů a pomoc jsou dostupné jen hlasem (ve výběru obrázky jsou Biblia, Rádio Lumen a Hudba).
 Připomínky z Google Kalendáře v daný čas zazvoní, přečtou název a opakují se, dokud uživatel neťukne na obrazovku.
 
 ---
@@ -58,8 +64,10 @@ Na úvodní obrazovce **podržte vyblednuté kolečko ⚙️ vpravo nahoře 2 se
   Do „ďalších oslovení“ pište, jak tomu člověku říká, i se slovenskými tvary: `syn, synovi, Janko, Jankovi`.
   U podobných jmen (Peter/Petra, Jana/Janko) vždy doplňte tvary, jinak se Pomocník zeptá, koho myslí.
 - **Pomoc:** hlavní a záložní kontakt (112 se nevolá).
-- **Rádio:** Rádio Lumen je přednastavené. Další stanici lze přidat (adresa `https://…`).
-- **Rozprávky, knihy a hudba:** MP3 soubory se vyberou přímo z telefonu. Název upravte tak, jak ho bude vyslovovat. Lze přidat i obrázek.
+- **Rádio:** Rádio Lumen je přednastavené a hraje na dlaždici 📻 i na povel „Rádio“. Další stanice lze přidat
+  (název + adresa `https://…`); pouští se hlasem podle názvu, např. „Rádio Regina“.
+- **Biblia a hudba:** tlačítky **➕ Biblia zo súborov** a **➕ Hudba zo súborov** se vyberou MP3 soubory přímo z telefonu
+  (lze označit více souborů najednou). Nejdřív je do telefonu nakopírujte, např. z počítače kabelem.
 - **Hlas a ovládání:**
   - **Ako dlho čakať na hlasový povel**: výchozí 15 sekund,
   - **Čas na druhé ťuknutie**: výchozí 15 sekund,

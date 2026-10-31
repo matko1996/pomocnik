@@ -4,7 +4,7 @@
  * Všetky nastavenia (kontakty, fotky, rádiá, kalendár) sa ukladajú len v tomto telefóne.
  */
 
-const VERSION = '1.3';
+const VERSION = '1.4';
 
 // ===================== Nastavenia a úložisko =====================
 
@@ -216,8 +216,8 @@ function greeting() {
   return H < 10 ? 'Dobré ráno.' : H >= 18 ? 'Dobrý večer.' : 'Dobrý deň.';
 }
 
-const HELP_TEXT = 'Ťukni na zelený mikrofón a povedz napríklad: Zavolaj Jankovi. Pusti rádio. ' +
-  'Pusti rozprávku. Pusti hudbu. Koľko je hodín. Čo mám dnes. Stop. ' +
+const HELP_TEXT = 'Ťukni na zelený mikrofón a povedz napríklad: Zavolaj Jankovi. Rádio. ' +
+  'Biblia. Hudba. Koľko je hodín. Čo mám dnes. ' +
   'Keď potrebuješ pomoc, povedz: Pomoc.';
 
 // ===================== Prehrávač =====================
@@ -225,9 +225,6 @@ const HELP_TEXT = 'Ťukni na zelený mikrofón a povedz napríklad: Zavolaj Jank
 const audio = new Audio();
 audio.preload = 'none';
 let blobUrl = null;
-let lastPosSave = 0;
-
-const posKey = id => 'pos:' + id;
 
 const player = {
   item: null,
@@ -258,7 +255,6 @@ const player = {
 
   pause() {
     if (!this.item) return;
-    if (this.kind === 'lib') savePos(true);
     audio.pause();
     updatePlayerUI();
   },
@@ -271,7 +267,6 @@ const player = {
   },
 
   stop() {
-    if (this.kind === 'lib') savePos(true);
     audio.pause();
     audio.removeAttribute('src');
     audio.load();
@@ -286,24 +281,9 @@ const player = {
   },
 };
 
-function savePos(force) {
-  if (player.kind !== 'lib' || !player.item) return;
-  const now = Date.now();
-  if (!force && now - lastPosSave < 5000) return;
-  lastPosSave = now;
-  try { localStorage.setItem(posKey(player.item.id), String(Math.floor(audio.currentTime || 0))); } catch { /* */ }
-}
-
-audio.addEventListener('timeupdate', () => savePos(false));
-audio.addEventListener('play', updatePlayerUI);
-audio.addEventListener('pause', updatePlayerUI);
+// Po skončení nahrávky hrá ďalšia náhodná z tej istej skupiny, kým používateľ nestlačí Stop.
 audio.addEventListener('ended', () => {
-  if (player.kind !== 'lib') return;
-  const item = player.item;
-  try { localStorage.removeItem(posKey(item.id)); } catch { /* */ }
-  if (item.cat === 'hudba') { playNext(); return; }
-  player.stop();
-  say('Koniec. ' + item.name + ' sa dohralo.');
+  if (player.kind === 'lib') playRandom(player.item.cat, true);
 });
 audio.addEventListener('error', () => {
   if (!player.item || !audio.getAttribute('src')) return;
@@ -328,19 +308,25 @@ function setMediaSession() {
 // Pri hovorení stíšime hudbu, aby bolo rozumieť.
 function duck(on) { audio.volume = on && player.playing ? 0.2 : 1; }
 
+const CAT_ICON = { citanie: '✝️', hudba: '🎵' };
+
+// Kým niečo hrá, celú obrazovku prekryje obrovské tlačidlo Stop.
 function updatePlayerUI() {
-  const p = $('player');
-  if (!player.item) {
-    p.classList.add('hidden');
-  } else {
-    p.classList.remove('hidden');
-    $('player-icon').replaceChildren(player.item.photo
-      ? h('img', { src: player.item.photo, alt: '', style: 'width:100%;max-height:11vh;object-fit:cover;border-radius:14px' })
-      : player.kind === 'radio' ? '📻' : player.item.cat === 'hudba' ? '🎵' : '📖');
-    $('player-toggle').textContent = audio.paused ? '▶️' : '⏸️';
-  }
-  if (screen === 'list') renderList();
+  $('playing').classList.toggle('hidden', !player.item);
+  if (!player.item) return;
+  $('playing-icon').replaceChildren(player.item.photo
+    ? h('img', { src: player.item.photo, alt: '' })
+    : player.kind === 'radio' ? '📻' : CAT_ICON[player.item.cat] || '🎵');
 }
+
+$('playing-stop').addEventListener('click', () => {
+  player.stop();
+  showScreen('home');
+  say('Vypnuté.');
+});
+
+// Rádio bez názvu = Rádio Lumen (alebo prvé v zozname).
+const defaultStation = () => S.stations.find(s => s.id === 'lumen' || /lumen/i.test(s.name)) || S.stations[0];
 
 async function playStation(st) {
   if (!st) return say('Žiadne rádio nie je nastavené.');
@@ -350,7 +336,8 @@ async function playStation(st) {
   await player.start(st, 'radio', st.url);
 }
 
-async function playLib(item) {
+// quiet: pri automatickom pokračovaní nič neohlasujeme, len hrá ďalej.
+async function playLib(item, quiet = false) {
   let src = item.url;
   if (item.file) {
     const blob = await idb.get(item.id).catch(() => null);
@@ -358,33 +345,34 @@ async function playLib(item) {
     src = URL.createObjectURL(blob);
   }
   if (!src) return say(`${item.name} nemá nastavený súbor ani adresu.`);
-  const pos = item.cat === 'citanie' ? Number(readJSON(posKey(item.id), 0)) : 0;
-  writeJSON('last:' + item.cat, item.id);
   if (player.item) player.stop();
-  const ok = await say((pos > 10 ? 'Pokračujem: ' : 'Púšťam: ') + item.name + '.');
-  if (!ok) { if (item.file) URL.revokeObjectURL(src); return; }
-  await player.start(item, 'lib', src, pos, !!item.file);
+  if (!quiet) {
+    const ok = await say(CAT_ANNOUNCE[item.cat] || 'Púšťam.');
+    if (!ok) { if (item.file) URL.revokeObjectURL(src); return; }
+  }
+  await player.start(item, 'lib', src, 0, !!item.file);
 }
 
-function playCategory(cat) {
+const CAT_ANNOUNCE = { citanie: 'Púšťam Bibliu.', hudba: 'Púšťam hudbu.' };
+const CAT_EMPTY = {
+  citanie: 'Zatiaľ tu nie je žiadna nahrávka Biblie. Požiadaj rodinu, nech ju nahrá.',
+  hudba: 'Zatiaľ tu nie je žiadna hudba. Požiadaj rodinu, nech ju nahrá.',
+};
+
+// Náhodná nahrávka zo skupiny; ak je ich viac, nezopakuje práve dohranú.
+function playRandom(cat, quiet = false) {
   const items = lib(cat);
-  if (!items.length) {
-    showScreen('list', cat);
-    return say(cat === 'hudba' ? 'Zatiaľ tu nie je žiadna hudba.' : 'Zatiaľ tu nie sú žiadne rozprávky ani knihy.');
-  }
-  const last = items.find(x => x.id === readJSON('last:' + cat, ''));
-  return playLib(last || items[0]);
+  if (!items.length) { player.stop(); return say(CAT_EMPTY[cat]); }
+  const lastId = player.item && player.item.id;
+  const pool = items.length > 1 ? items.filter(x => x.id !== lastId) : items;
+  return playLib(pool[Math.floor(Math.random() * pool.length)], quiet);
 }
 
 function playNext() {
+  if (player.kind === 'lib') return playRandom(player.item.cat, true);
   if (player.kind === 'radio') {
     const i = S.stations.findIndex(s => s.id === player.item.id);
     return playStation(S.stations[(i + 1) % S.stations.length]);
-  }
-  if (player.kind === 'lib') {
-    const items = lib(player.item.cat);
-    const i = items.findIndex(x => x.id === player.item.id);
-    return playLib(items[(i + 1) % items.length]);
   }
   return say('Práve nič nehrá.');
 }
@@ -460,26 +448,21 @@ function confirmTap(key, el, prompt, action) {
 // ===================== Obrazovky =====================
 
 let screen = 'home';
-let listKind = null;
-const ITEM_COLORS = ['#7c3aed', '#ea580c', '#0d9488', '#2563eb', '#db2777', '#65a30d', '#ca8a04', '#0891b2'];
 
-// Obrazovky: home (mikrofón + výber), menu (Rodina, Rádio, Hudba), contacts, list.
+// Obrazovky: home (mikrofón + výber), menu (Biblia, Rádio, Hudba), contacts (fotky – len na hlasový povel „zavolaj“).
 // Na obrazovkách nie je žiadny text – používateľ nečíta, všetko sa hovorí nahlas.
-function showScreen(name, kind) {
+function showScreen(name) {
   screen = name;
-  listKind = kind || null;
   disarm();
-  for (const s of ['home', 'menu', 'contacts', 'list']) $('screen-' + s).classList.toggle('hidden', s !== name);
+  for (const s of ['home', 'menu', 'contacts']) $('screen-' + s).classList.toggle('hidden', s !== name);
   $('subbar').classList.toggle('hidden', name === 'home');
   $('btn-settings').classList.toggle('hidden', name !== 'home');
   if (name === 'contacts') renderContacts();
-  if (name === 'list') renderList();
 }
 
-// Späť: z kontaktov a zoznamov do výberu, z výberu domov.
 function goBack() {
   stopSpeaking();
-  showScreen(screen === 'contacts' || screen === 'list' ? 'menu' : 'home');
+  showScreen('home');
 }
 
 // Mriežka vyplní celú obrazovku – čím menej položiek, tým väčšie obrázky.
@@ -502,25 +485,6 @@ function renderContacts() {
       confirmTap('c:' + c.id, el, `${c.name}. Ťukni ešte raz a zavolám.`, () => callContact(c)));
     box.append(el);
   }
-}
-
-function renderList() {
-  const box = $('screen-list');
-  const items = listKind === 'radio' ? S.stations : lib(listKind);
-  const emoji = listKind === 'radio' ? '📻' : listKind === 'hudba' ? '🎵' : '📖';
-  box.replaceChildren();
-  fitGrid(box, items.length);
-  if (!items.length) { box.append(h('div', { class: 'empty' }, emoji)); return; }
-  items.forEach((it, i) => {
-    const current = player.item && player.item.id === it.id;
-    const el = h('button', { class: 'item' + (current ? ' playing' : ''), style: `--c:${ITEM_COLORS[i % ITEM_COLORS.length]}`, 'aria-label': it.name },
-      it.photo ? h('img', { src: it.photo, alt: '' }) : h('span', { class: 'ii' }, emoji));
-    el.addEventListener('click', () => {
-      if (current) { if (audio.paused) player.resume(); else player.pause(); return; }
-      if (listKind === 'radio') playStation(it); else playLib(it);
-    });
-    box.append(el);
-  });
 }
 
 // ===================== Kalendár a pripomienky =====================
@@ -775,7 +739,8 @@ const hasWord = (tk, ...ws) => tk.some(t => ws.includes(t));
 const FILLER = new Set(['pusti', 'pust', 'zapni', 'zahraj', 'hraj', 'zavolaj', 'zavolat', 'volaj', 'vytoc', 'prosim',
   'mi', 'mne', 'chcem', 'by', 'som', 'sa', 'si', 'rozpravku', 'rozpravky', 'rozpravka', 'knihu', 'knihy', 'kniha',
   'hudbu', 'hudba', 'pesnicku', 'pesnicky', 'radio', 'a', 'o', 'na', 'do', 'z', 's', 'so', 'je', 'ten', 'tu', 'to',
-  'mojmu', 'mojej', 'moju', 'mojho', 'moja', 'moj', 'teraz', 'hned', 'citaj', 'precitaj']);
+  'mojmu', 'mojej', 'moju', 'mojho', 'moja', 'moj', 'teraz', 'hned', 'citaj', 'precitaj',
+  'kontakt', 'kontaktu', 'kontaktom', 'kontakty', 'biblia', 'bibliu', 'biblie', 'biblii', 'bible']);
 
 const lcp = (a, b) => { let i = 0; while (i < a.length && i < b.length && a[i] === b[i]) i++; return i; };
 
@@ -840,9 +805,8 @@ function interpret(text) {
     const m = bestMatch(S.contacts, rest, contactScore, CONTACT_MARGIN);
     return m ? { type: 'call', m } : { type: 'contacts' };
   }
-  const st = bestMatch(S.stations, rest, titleScore);
-  if (has(tk, 'radi') || st) return { type: 'radio', item: st && st.item };
-  if (has(tk, 'rozpravk', 'knih', 'citaj', 'precitaj', 'pribeh', 'audiokni')) {
+  // „Biblia“ / „Bible“ (aj rozprávky, knihy) = náhodná nahrávka zo skupiny Biblia, ak nepovie konkrétny názov.
+  if (has(tk, 'bibli', 'pismo', 'rozpravk', 'knih', 'citaj', 'precitaj', 'pribeh', 'audiokni')) {
     const m = bestMatch(lib('citanie'), rest, titleScore);
     return { type: 'play', cat: 'citanie', item: m && m.item };
   }
@@ -850,6 +814,9 @@ function interpret(text) {
     const m = bestMatch(lib('hudba'), rest, titleScore);
     return { type: 'play', cat: 'hudba', item: m && m.item };
   }
+  // „Rádio“ = Rádio Lumen; „rádio …“ s názvom = stanica z nastavení.
+  const st = bestMatch(S.stations, rest, titleScore);
+  if (has(tk, 'radi') || st) return { type: 'radio', item: st && st.item };
   if (has(tk, 'hodin') || hasWord(tk, 'cas', 'kolko')) return { type: 'time' };
   if (has(tk, 'datum', 'ktoreho', 'mesiac') || hasWord(tk, 'den')) return { type: 'date' };
   if (has(tk, 'program', 'kalendar', 'liek', 'pripomien', 'udalost', 'plan') || hasWord(tk, 'dnes', 'zajtra')) return { type: 'today' };
@@ -881,7 +848,7 @@ async function handleSpeech(alts, wasPlaying) {
 async function run(r, wasPlaying) {
   switch (r.type) {
     case 'help': return callHelp();
-    case 'stop': player.stop(); return say('Vypnuté.');
+    case 'stop': player.stop(); showScreen('home'); return say('Vypnuté.');
     case 'resume':
       if (player.item) { player.resume(); return; }
       return say('Práve nič nehrá.');
@@ -895,8 +862,8 @@ async function run(r, wasPlaying) {
     case 'contacts':
       showScreen('contacts');
       return say('Komu mám zavolať? Povedz meno alebo ťukni na fotku.');
-    case 'radio': return playStation(r.item || S.stations[0]);
-    case 'play': return r.item ? playLib(r.item) : playCategory(r.cat);
+    case 'radio': return playStation(r.item || defaultStation());
+    case 'play': return r.item ? playLib(r.item) : playRandom(r.cat);
     case 'volume': await say('Hlasitosť sa mení tlačidlami na boku telefónu.'); break;
     case 'time': await say(timeSentence()); break;
     case 'date': await say(dateSentence()); break;
@@ -909,25 +876,11 @@ async function run(r, wasPlaying) {
 
 // ===================== Ovládanie dotykom =====================
 
+// Výber: ✝️ náhodná nahrávka Biblie, 📻 Rádio Lumen, 🎵 náhodná hudba.
 const TILES = {
-  contacts() {
-    showScreen('contacts');
-    say(S.contacts.length ? 'Rodina. Ťukni na fotku alebo povedz meno.' : 'Zatiaľ tu nie sú žiadne kontakty.');
-  },
-  radio() {
-    if (S.stations.length === 1) {
-      const st = S.stations[0];
-      if (player.item && player.item.id === st.id && player.playing) { player.stop(); say('Rádio vypnuté.'); }
-      else playStation(st);
-      return;
-    }
-    showScreen('list', 'radio');
-    say('Rádio. Ťukni na stanicu.');
-  },
-  music() {
-    showScreen('list', 'hudba');
-    say('Hudba. Ťukni na obrázok alebo povedz názov.');
-  },
+  bible() { playRandom('citanie'); },
+  radio() { playStation(defaultStation()); },
+  music() { playRandom('hudba'); },
 };
 
 for (const el of document.querySelectorAll('.tile')) {
@@ -936,11 +889,9 @@ for (const el of document.querySelectorAll('.tile')) {
 for (const el of document.querySelectorAll('.mic')) el.addEventListener('click', listen);
 $('btn-menu').addEventListener('click', () => {
   showScreen('menu');
-  say('Vyber: rodina, rádio, alebo hudba.');
+  say('Vyber: Biblia, rádio, alebo hudba.');
 });
 $('btn-back').addEventListener('click', goBack);
-$('player-toggle').addEventListener('click', () => { if (audio.paused) player.resume(); else player.pause(); });
-$('player-stop').addEventListener('click', () => { player.stop(); say('Vypnuté.'); });
 
 $('help-ok').addEventListener('click', () => {
   $('help-check').classList.add('hidden');
@@ -1025,7 +976,7 @@ function openSettingsGuarded() {
 function closeSettings() {
   saveSettings();
   $('settings').classList.add('hidden');
-  showScreen(screen, listKind);
+  showScreen(screen);
 }
 
 function field(label, obj, key, type = 'text', extra = {}) {
@@ -1158,7 +1109,8 @@ function settingsHelp() {
 function settingsStations() {
   return [
     h('h2', {}, '📻 Rádio'),
-    h('p', { class: 'hint' }, 'Adresa musí začínať https://. Keď je nastavené len jedno rádio, dlaždica Rádio ho rovno zapne a vypne.'),
+    h('p', { class: 'hint' }, 'Adresa musí začínať https://. Dlaždica 📻 a povel „Rádio“ pustia Rádio Lumen; ostatné stanice sa pustia hlasom ' +
+      'podľa názvu (napr. „Rádio Regina“).'),
     S.stations.map((st, i) => h('div', { class: 'card' },
       h('div', { class: 'contact-head' }, thumb(st, '📻'), h('div', { class: 'grow' }, h('b', {}, st.name || '(bez názvu)'), photoButtons(st))),
       field('Názov', st, 'name'),
@@ -1174,7 +1126,7 @@ function settingsStations() {
   ];
 }
 
-const CAT_LABEL = { citanie: 'Rozprávky a knihy', hudba: 'Hudba' };
+const CAT_LABEL = { citanie: 'Biblia ✝️', hudba: 'Hudba 🎵' };
 
 function settingsLibrary() {
   const addFiles = cat => pickFile('audio/*', true, async files => {
@@ -1190,11 +1142,12 @@ function settingsLibrary() {
     saveSettings(); renderSettings();
   });
   return [
-    h('h2', {}, '📚 Rozprávky, knihy a hudba'),
-    h('p', { class: 'hint' }, 'Súbory MP3 sa nahrajú priamo do Pomocníka v tomto telefóne. Názov upravte tak, ako ho bude vyslovovať ' +
-      '(napr. „Janko Hraško“). Knihy si pamätajú, kde skončili.'),
+    h('h2', {}, '✝️ Biblia a 🎵 hudba'),
+    h('p', { class: 'hint' }, 'Súbory MP3 sa nahrajú priamo do Pomocníka v tomto telefóne (naraz sa dá označiť viac súborov). ' +
+      'Dlaždica ✝️ a povel „Biblia“ púšťajú náhodne nahrávky Biblie, dlaždica 🎵 a povel „Hudba“ náhodne hudbu – ' +
+      'jednu za druhou, kým sa nestlačí Stop.'),
     S.library.map((it, i) => h('div', { class: 'card' },
-      h('div', { class: 'contact-head' }, thumb(it, it.cat === 'hudba' ? '🎵' : '📖'),
+      h('div', { class: 'contact-head' }, thumb(it, CAT_ICON[it.cat]),
         h('div', { class: 'grow' }, h('b', {}, it.name || '(bez názvu)'),
           h('div', { class: 'hint', style: 'margin:4px 0 0' }, it.file ? `Súbor v telefóne, ${(it.size / 1048576).toFixed(1)} MB` : 'Odkaz na internet'),
           photoButtons(it))),
@@ -1215,11 +1168,10 @@ function settingsLibrary() {
           if (!confirm(`Zmazať ${it.name}?`)) return;
           if (player.item && player.item.id === it.id) player.stop();
           if (it.file) await idb.del(it.id).catch(() => {});
-          try { localStorage.removeItem(posKey(it.id)); } catch { /* */ }
           S.library.splice(i, 1); saveSettings(); renderSettings();
         }, 'danger')))),
     h('div', { class: 'row', style: 'margin:0 12px' },
-      btn('➕ Rozprávky/knihy zo súborov', () => addFiles('citanie'), 'primary'),
+      btn('➕ Biblia zo súborov', () => addFiles('citanie'), 'primary'),
       btn('➕ Hudba zo súborov', () => addFiles('hudba'), 'primary'),
       btn('➕ Odkaz z internetu', () => {
         S.library.push({ id: uid(), name: '', aliases: '', cat: 'citanie', url: '', file: false, size: 0, photo: '' });
