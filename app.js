@@ -4,7 +4,7 @@
  * Všetky nastavenia (kontakty, fotky, rádiá, kalendár) sa ukladajú len v tomto telefóne.
  */
 
-const VERSION = '1.4';
+const VERSION = '1.5';
 
 // ===================== Nastavenia a úložisko =====================
 
@@ -310,16 +310,27 @@ function duck(on) { audio.volume = on && player.playing ? 0.2 : 1; }
 
 const CAT_ICON = { citanie: '✝️', hudba: '🎵' };
 
-// Kým niečo hrá, celú obrazovku prekryje obrovské tlačidlo Stop.
+// Kým niečo hrá – alebo Pomocník práve vykonáva povel (ohlasuje, hovorí, chystá volanie) –
+// celú obrazovku prekryje obrovské tlačidlo Stop.
+let busyIcon = null;
+function setBusy(icon) {
+  busyIcon = icon;
+  updatePlayerUI();
+}
+
 function updatePlayerUI() {
-  $('playing').classList.toggle('hidden', !player.item);
-  if (!player.item) return;
-  $('playing-icon').replaceChildren(player.item.photo
-    ? h('img', { src: player.item.photo, alt: '' })
+  const show = !!(player.item || busyIcon);
+  $('playing').classList.toggle('hidden', !show);
+  if (!show) return;
+  $('playing-icon').replaceChildren(!player.item ? busyIcon
+    : player.item.photo ? h('img', { src: player.item.photo, alt: '' })
     : player.kind === 'radio' ? '📻' : CAT_ICON[player.item.cat] || '🎵');
 }
 
+// Stop zastaví prehrávanie aj rozhovor; prerušené ohlásenie zruší aj chystané volanie či prehrávanie.
 $('playing-stop').addEventListener('click', () => {
+  busyIcon = null;
+  stopSpeaking();
   player.stop();
   showScreen('home');
   say('Vypnuté.');
@@ -347,10 +358,17 @@ async function playLib(item, quiet = false) {
   if (!src) return say(`${item.name} nemá nastavený súbor ani adresu.`);
   if (player.item) player.stop();
   if (!quiet) {
+    const icon = CAT_ICON[item.cat] || '🎵';
+    setBusy(icon);
     const ok = await say(CAT_ANNOUNCE[item.cat] || 'Púšťam.');
-    if (!ok) { if (item.file) URL.revokeObjectURL(src); return; }
+    if (!ok) {
+      if (busyIcon === icon) setBusy(null);
+      if (item.file) URL.revokeObjectURL(src);
+      return;
+    }
   }
   await player.start(item, 'lib', src, 0, !!item.file);
+  setBusy(null);
 }
 
 const CAT_ANNOUNCE = { citanie: 'Púšťam Bibliu.', hudba: 'Púšťam hudbu.' };
@@ -393,8 +411,13 @@ async function callContact(c) {
   const num = cleanNumber(c.phone);
   if (!num) return say(`${c.name} nemá nastavené telefónne číslo.`);
   player.pause();
+  setBusy('📞');   // Stop počas ohlásenia volanie zruší
   const ok = await say((c.voiceName ? `Volám ${c.voiceName}.` : `Volám: ${c.name}.`) + greenHint(' Potom ťukni na zelený telefón.'));
-  if (ok) dial(num);
+  if (busyIcon === '📞') setBusy(null);
+  if (!ok) return;
+  player.stop();
+  showScreen('home');
+  dial(num);
 }
 
 const HELP_WINDOW = 10 * 60e3;
@@ -408,7 +431,8 @@ async function callHelp() {
   const num = cleanNumber(target.phone);
   if (!num) return say(`${target.name} nemá nastavené telefónne číslo.`);
   writeJSON('help', { t: Date.now(), step, asked: false });
-  player.pause();
+  player.stop();
+  showScreen('home');
   // Pri pomoci voláme aj vtedy, ak vetu niečo preruší.
   await say(`Volám pomoc: ${target.voiceName || target.name}.` + greenHint(' Ťukni na zelený telefón.'));
   dial(num);
@@ -864,12 +888,20 @@ async function run(r, wasPlaying) {
       return say('Komu mám zavolať? Povedz meno alebo ťukni na fotku.');
     case 'radio': return playStation(r.item || defaultStation());
     case 'play': return r.item ? playLib(r.item) : playRandom(r.cat);
-    case 'volume': await say('Hlasitosť sa mení tlačidlami na boku telefónu.'); break;
-    case 'time': await say(timeSentence()); break;
-    case 'date': await say(dateSentence()); break;
-    case 'today': await speakToday(); break;
-    case 'info': await say(HELP_TEXT); break;
     case 'home': showScreen('home'); break;
+    default: {
+      // Povely, pri ktorých Pomocník len hovorí – Stop ho umlčí.
+      setBusy('🔊');
+      const ok = await ({
+        volume: () => say('Hlasitosť sa mení tlačidlami na boku telefónu.'),
+        time: () => say(timeSentence()),
+        date: () => say(dateSentence()),
+        today: speakToday,
+        info: () => say(HELP_TEXT),
+      })[r.type]();
+      if (busyIcon === '🔊') setBusy(null);
+      if (!ok) return;
+    }
   }
   if (wasPlaying) player.resume();
 }
